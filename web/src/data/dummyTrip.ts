@@ -1,6 +1,7 @@
 import type { Trip } from '@/types'
 
-// Dummy trip around 서울 강남: car → 1 카페(경유) → 2 나 → 3 다음 픽업
+// Dummy trip around 서울 강남: car → 1 카페(경유) → 2 나 → 3 다른 탑승자
+// Labels are what the driver typed: neutral, never "내 위치" (the web decides that per passenger).
 const route = [
   { lat: 37.4905, lng: 127.012 },
   { lat: 37.492, lng: 127.016 },
@@ -25,8 +26,8 @@ export const dummyTrip: Trip = {
   route,
   stops: [
     { id: 's1', order: 1, kind: 'waypoint', label: '카페', position: route[3], routeIndex: 3, isMine: false },
-    { id: 's2', order: 2, kind: 'pickup', label: '내 위치', position: route[6], routeIndex: 6, isMine: true },
-    { id: 's3', order: 3, kind: 'pickup', label: '다음 픽업', position: route[9], routeIndex: 9, isMine: false },
+    { id: 's2', order: 2, kind: 'pickup', label: '픽업', position: route[6], routeIndex: 6, isMine: true },
+    { id: 's3', order: 3, kind: 'pickup', label: '픽업', position: route[9], routeIndex: 9, isMine: false },
   ],
 }
 

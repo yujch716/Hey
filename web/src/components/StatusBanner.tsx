@@ -1,3 +1,4 @@
+import { stopLabel, stopName } from '@/lib/stops'
 import { cn } from '@/lib/utils'
 import type { Phase, Stop, TripSnapshot, Vehicle } from '@/types'
 
@@ -18,16 +19,33 @@ function clock(ms: number) {
   return new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: '2-digit' }).format(ms)
 }
 
-function copyFor(phase: Phase, stops: Stop[], vehicle: Vehicle) {
-  const waypoint = stops.find((s) => s.kind === 'waypoint')
+function copyFor(snapshot: TripSnapshot, stops: Stop[], vehicle: Vehicle) {
+  const { phase, currentStop } = snapshot
   const mine = stops.find((s) => s.isMine)!
+  const nextIsMine = stops.find((s) => s.order > currentStop.order)?.isMine ?? false
+  const thenMe = nextIsMine ? '. 그다음이 내 차례예요' : ''
+  const waypoint = currentStop.kind === 'waypoint'
+
   switch (phase) {
     case 'departed':
-      return { headline: '출발했어요', note: waypoint ? `${waypoint.label}에 먼저 들렀다 와요` : '나에게 오는 중이에요' }
-    case 'toWaypoint':
-      return { headline: null, note: `${waypoint?.label}에 들르는 중이에요. 그다음이 내 차례예요` }
-    case 'atWaypoint':
-      return { headline: null, note: `${waypoint?.label}에 잠깐 들렀어요. 곧 다시 출발해요` }
+      return {
+        headline: '출발했어요',
+        note: currentStop.order < mine.order ? `${stopName(currentStop)}에 먼저 들렀다 와요` : '나에게 오는 중이에요',
+      }
+    case 'toEarlierStop':
+      return {
+        headline: null,
+        note: waypoint
+          ? `${currentStop.label}에 들르는 중이에요${thenMe}`
+          : `${stopName(currentStop)}로 가는 중이에요${thenMe}`,
+      }
+    case 'atEarlierStop':
+      return {
+        headline: null,
+        note: waypoint
+          ? `${currentStop.label}에 잠깐 들렀어요${thenMe || '. 곧 다시 출발해요'}`
+          : `${stopName(currentStop)}에서 태우는 중이에요${thenMe}`,
+      }
     case 'toMe':
       return { headline: null, note: `이제 ${mine.order}번째, 나에게 오는 중이에요` }
     case 'near':
@@ -43,7 +61,7 @@ export function StatusBanner({ snapshot, stops, vehicle, now }: Props) {
   const { phase, etaSeconds } = snapshot
   const signal = SIGNAL_PHASES.includes(phase)
   const done = phase === 'boarded'
-  const copy = copyFor(phase, stops, vehicle)
+  const copy = copyFor(snapshot, stops, vehicle)
   const secondsAgo = Math.max(0, Math.round((now - snapshot.updatedAt) / 1000))
   const showEta = !done && phase !== 'arrived'
 
@@ -92,12 +110,12 @@ function StepTrack({ snapshot, stops, signal }: { snapshot: TripSnapshot; stops:
   const passedMine = phase === 'arrived' || phase === 'boarded'
 
   const isDone = (s: Stop) =>
-    s.order < currentStopOrder || (s.isMine && passedMine) || (phase === 'atWaypoint' && s.order === currentStopOrder)
+    s.order < currentStopOrder || (s.isMine && passedMine) || (phase === 'atEarlierStop' && s.order === currentStopOrder)
   const isCurrent = (s: Stop) => !isDone(s) && s.order === currentStopOrder
 
   const nodes = [{ key: 'start', label: '출발', done: true, current: false, mine: false }, ...stops.map((s) => ({
     key: s.id,
-    label: s.label,
+    label: stopLabel(s),
     done: isDone(s),
     current: isCurrent(s),
     mine: s.isMine,

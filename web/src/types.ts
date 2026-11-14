@@ -1,3 +1,5 @@
+// server/src/common/types.ts의 타입과 동기화. 수정 시 양쪽 모두 고칠 것
+
 export type LatLng = { lat: number; lng: number }
 
 export type StopKind = 'waypoint' | 'pickup'
@@ -22,8 +24,8 @@ export type Vehicle = {
 
 export type Phase =
   | 'departed'
-  | 'toWaypoint'
-  | 'atWaypoint'
+  | 'toEarlierStop' // heading to a stop before mine (a waypoint or another passenger)
+  | 'atEarlierStop' // standing at a stop before mine
   | 'toMe'
   | 'near'
   | 'arrived'
@@ -36,7 +38,10 @@ export type TripSnapshot = {
   etaSeconds: number // to my stop
   updatedAt: number // epoch ms of the last position update
   currentStopOrder: number // next stop the car is heading to
+  currentStop: CurrentStop // the stop the car is heading to or standing at
 }
+
+export type CurrentStop = Pick<Stop, 'order' | 'kind' | 'label'>
 
 export type Trip = {
   vehicle: Vehicle
