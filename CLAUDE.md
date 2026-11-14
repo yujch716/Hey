@@ -10,10 +10,15 @@
 
 | 폴더 | 내용 | 상태 |
 | --- | --- | --- |
-| `car-app/` | Kotlin, Android Studio, Pleos Connect SDK (minSdk 28, Gradle 8+) | 아직 없음 |
+| `car-app/` | Kotlin, Android Studio, Pleos Connect SDK (minSdk 28, Gradle 8+) | 프로젝트 껍데기만 있음 |
 | `server/` | NestJS (TypeScript), WebSocket, 나중에 PostgreSQL·Redis | 아직 없음 |
 | `web/` | React + Vite + TypeScript + Tailwind v4 + shadcn/ui, yarn 4 | 더미 데이터로 동작 |
 | `apk/` | 제출용 release APK (`팀명_nawa_release.apk`) | |
+
+car-app SDK 버전 (`car-app/app/build.gradle.kts`):
+- `compileSdk = 37`: 사용하는 AndroidX 라이브러리(core 1.19, lifecycle 2.11)가 API 37 이상으로 컴파일해야 한다.
+- `targetSdk = 34`: Pleos 차량 OS가 API 34라서 동작 기준을 34에 맞춘다.
+- `minSdk = 28`: Pleos 보안 요건.
 
 ## 핵심 개념
 
