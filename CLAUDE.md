@@ -11,7 +11,7 @@
 | 폴더 | 내용 | 상태 |
 | --- | --- | --- |
 | `car-app/` | Kotlin, Android Studio, Pleos Connect SDK (minSdk 28, Gradle 8+) | 프로젝트 껍데기만 있음 |
-| `server/` | NestJS (TypeScript), WebSocket, 나중에 PostgreSQL·Redis | 아직 없음 |
+| `server/` | NestJS (TypeScript), socket.io, 나중에 PostgreSQL·Redis, yarn 4 | MVP (메모리 저장소) |
 | `web/` | React + Vite + TypeScript + Tailwind v4 + shadcn/ui, yarn 4 | 더미 데이터로 동작 |
 | `apk/` | 제출용 release APK (`팀명_nawa_release.apk`) | |
 
@@ -23,24 +23,33 @@ car-app SDK 버전 (`car-app/app/build.gradle.kts`):
 ## 핵심 개념
 
 - **Trip**: 한 번의 픽업 운행. 차량 정보, 경로(`route`), 정류지 목록(`stops`)을 가진다.
+  - 경로와 구간별 소요 시간은 운행 생성 시 서버가 카카오모빌리티 길찾기(다중 경유지)로 한 번 만든다. 차량 앱은 출발점과 정류지만 보낸다.
+  - 카카오 키가 없거나 호출이 실패하면 정류지를 직선으로 잇고 구간 시간을 추정한다(개발·테스트용).
 - **Stop**: 정류지. `kind` = `waypoint`(카페 등 경유) | `pickup`(탑승자). 방문 순서(`order`)가 있다.
   - 모든 탑승자에게 모든 정류지와 순서를 보여준다. 단, 핀에는 이름이나 전화번호 없이 순번과 짧은 라벨만 표시한다.
-- **공유 링크**: 정류지마다 하나씩 만든다. 추측할 수 없는 토큰을 쓰고, 탑승 완료 시 만료된다.
-- **TripSnapshot**: 서버가 웹으로 보내는 실시간 상태. 타입은 `web/src/types.ts`가 기준이다.
-  - `phase` = `departed` | `toWaypoint` | `atWaypoint` | `toMe` | `near` | `arrived` | `boarded`
+  - 서버의 `label`은 운전자가 붙인 중립 문구다(예: 카페, 픽업). 탑승자 시점 문구("내 위치", "다음 픽업")를 담지 않는다.
+  - 웹 표시: 내 정류지는 "내 위치", 다른 픽업은 "픽업", 경유지는 `label` 그대로. 문장에서는 다른 픽업을 "{order}번 정류지"로 부른다.
+- **공유 링크**: 픽업 정류지마다 하나씩 만든다. 추측할 수 없는 토큰을 쓰고, 그 정류지가 완료되면 만료된다.
+- **TripSnapshot**: 서버가 웹으로 보내는 실시간 상태.
+  - `phase` = `departed` | `toEarlierStop` | `atEarlierStop` | `toMe` | `near` | `arrived` | `boarded` (EarlierStop = 내 앞 순번 정류지. 경유지든 다른 탑승자든)
+  - 타입 기준은 `server/src/common/types.ts`. `web/src/types.ts`는 같은 내용으로 맞춘다.
 - **빠른 응답**: 탑승자가 [나왔어요] [5분 늦어요] [여기서 기다릴게요]를 누르면 차 안에서 TTS로 읽어준다.
-- **탑승 판정**: 차가 정차한 상태에서 문이 열리면 해당 정류지를 완료로 처리한다.
+- **정류지 진행**: 정류지 하나씩 `stopArrived` → `stopCompleted { by }` 순서로 진행한다. 완료 판정은 차량 앱이 한다.
+  - 픽업: 정차 중 운전석이 아닌 문이 열렸다 닫힘(`door`), 또는 운전자의 [탑승 완료] 버튼(`button`)
+  - 경유지: 운전자의 [다음으로] 버튼(`button`), 또는 도착 후 차가 다시 출발(`departed`)
+- **ETA**: 내비는 현재 목적지까지의 ETA만 준다. 그 뒤 정류지의 ETA는 서버가 계산한다. 운전자 앱 지도는 `GET /trips/:tripId`로 정류지별 ETA와 탑승자 공유 위치를 받는다.
+  - 현재 목적지 ETA + 그 뒤 구간 소요 시간 합 + 앞 정류지마다 정차 여유 60초
 
 ## 실시간 갱신
 
-- 차 → 서버: 3~5초 간격으로 위치를 보낸다(멀면 간격을 늘림).
+- 차 → 서버: 3~5초 간격으로 위치와 현재 목적지까지의 내비 ETA를 보낸다(멀면 간격을 늘림).
 - 서버 → 웹: WebSocket으로 푸시한다. 웹은 위치 사이를 보간 애니메이션으로 잇는다.
 - 웹에는 마지막 갱신 시각을 항상 보여준다(네트워크 끊김 대비).
 
 ## Pleos 제약 (설계 시 반드시 고려)
 
-- **NaviHelper**: `requestRoute`로 목적지, `addWaypoint`로 경유지를 넣는다. 경유지는 최대 2개다.
-  정류지가 더 많으면 앱이 순서를 관리하면서, 도착할 때마다 다음 정류지를 넣는다.
+- **NaviHelper**: 경유지(`addWaypoint`)는 쓰지 않는다. 다음 정류지 하나만 `requestRoute`로 목적지로 넣고,
+  그 정류지가 완료되면 다음 정류지를 넣는다. 정류지 순서는 앱이 관리한다.
 - **Fused Location SDK**는 "준비 중"이다. `isSupported`로 확인하고, 안 되면 NaviHelper `getCurrentLocationInfo`나 AAOS `LocationManager`로 대체한다.
 - 차량에서는 연락처·SMS·전화가 제한될 수 있다. 링크 공유는 차 화면의 QR → 운전자 폰의 공유 시트로 한다.
 - 권한은 Pleos 앱마켓 사전 승인 범위 안에서만 쓴다. 지금 쓰는 것: `CAR_DOORS`, `CAR_DRIVE`, `CAR_INFO`, `FUSED_LOCATION`, NaviHelper, TTS.
