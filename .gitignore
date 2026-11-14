@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Yarn 4 (zero-install 안 씀)
+**/.yarn/install-state.gz
+**/.yarn/cache/
+
+# Build output
+dist/
+dist-ssr/
+
+# Env (예시 파일은 커밋)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Android / Gradle
+.gradle/
+build/
+.cxx/
+.externalNativeBuild/
+captures/
+local.properties
+*.iml
+.kotlin/
+
+# 주의: apk/ 폴더(제출용 release APK)는 커밋해야 하므로 *.apk를 무시하지 않는다.
+
+# IDE / OS
+.idea/
+.DS_Store
