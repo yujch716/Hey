@@ -1,0 +1,57 @@
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, system-ui, sans-serif;
+
+  /* 나와 palette */
+  --color-ink: #1a2433;
+  --color-muted: #6b7684;
+  --color-line: #e3e7ec;
+  --color-paper: #f2f4f6;
+  --color-backdrop: #d9dee4;
+  --color-route: #2e62f5;
+  --color-signal: #ffb21e;
+  --color-signal-soft: #fff3d6;
+  --color-ground: #e8ecef;
+
+  /* shadcn tokens, mapped onto the palette */
+  --color-background: #ffffff;
+  --color-foreground: var(--color-ink);
+  --color-primary: var(--color-ink);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--color-paper);
+  --color-secondary-foreground: var(--color-ink);
+  --color-border: var(--color-line);
+  --color-ring: var(--color-route);
+  --radius: 0.875rem;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-backdrop);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+}
+
+@keyframes halo {
+  0% { transform: scale(0.6); opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
