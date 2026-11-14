@@ -1,3 +1,4 @@
+import { stopLabel } from '@/lib/stops'
 import { cn } from '@/lib/utils'
 import type { Stop } from '@/types'
 
@@ -22,7 +23,7 @@ export function CarMarker({ heading }: { heading: number }) {
 
 export function StopPin({ stop, passed }: { stop: Stop; passed: boolean }) {
   return (
-    <div className="flex -translate-x-1/2 -translate-y-[15px] flex-col items-center" aria-label={`${stop.order}번째 정류지 ${stop.label}`}>
+    <div className="flex -translate-x-1/2 -translate-y-[15px] flex-col items-center" aria-label={`${stop.order}번 정류지 ${stopLabel(stop)}`}>
       <span
         className={cn(
           'grid size-[30px] place-items-center rounded-full border-[3px] text-[13px] font-extrabold shadow-[0_1px_4px_rgba(26,36,51,0.3)]',
@@ -39,7 +40,7 @@ export function StopPin({ stop, passed }: { stop: Stop; passed: boolean }) {
           passed && !stop.isMine && 'opacity-45',
         )}
       >
-        {stop.label}
+        {stopLabel(stop)}
       </span>
     </div>
   )
