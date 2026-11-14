@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "allowImportingTsExtensions": true,
+    // web/src/data/dummyTrip.ts imports its types through the web alias
+    "paths": { "@/*": ["../web/src/*.ts"] }
+  },
+  "include": ["scripts"]
+}
