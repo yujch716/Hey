@@ -33,6 +33,8 @@ SDK 동작 근거는 `docs/sdk-findings.md`. 단일 Activity + Compose, 패키�
 | `trip/TripService.kt` | 포그라운드 서비스(위치 유형). `requestRoute`로 내비가 화면을 가져가도 운행 루프와 운전자 WebSocket을 유지. 메시지가 오면 앱을 앞으로 띄우고, OS가 막으면 헤드업 알림 |
 | `data/` | 서버 API(OkHttp), socket.io, DataStore(차량 정보·설정), 차종 목록 |
 | `ui/` | 차량 등록 → 운행 준비 → 공유(QR) → 운행 패널, 설정 |
+| `ui/theme/Theme.kt` | 색(`Palette`, 탑승자 웹과 같은 팔레트)과 타이포그래피를 여기서만 정의. 화면 코드에는 색 값·sp를 직접 쓰지 않는다. 터치 높이 76dp 이상(`TouchHeight`) |
+| `ui/StopTimeline.kt` | 운행 패널의 세로 정류지 타임라인(완료·현재·남음, 정류지별 ETA, 탑승자 메시지 말풍선) |
 | `sdkcheck/` | 3단계 SDK 검증 화면. 설정 > SDK 진단 |
 
 - 서버·웹 주소는 빌드 변형별 `BuildConfig.SERVER_URL` / `WEB_BASE_URL`:
