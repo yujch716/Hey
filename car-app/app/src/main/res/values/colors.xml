@@ -2,4 +2,6 @@
 <resources>
     <!-- Window background before Compose draws (no flash of another color). Same as Palette.Ground in ui/theme/Theme.kt -->
     <color name="window_background">#FFF2F4F6</color>
+    <!-- Launcher icon background, matches the icon's white -->
+    <color name="ic_launcher_background">#FFFFFFFF</color>
 </resources>

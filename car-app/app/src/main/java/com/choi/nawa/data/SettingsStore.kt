@@ -1,6 +1,7 @@
 package com.choi.nawa.data
 
 import android.content.Context
+import com.choi.nawa.BuildConfig
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -21,7 +22,7 @@ class SettingsStore(context: Context) {
     }
 
     /** Demo mode swaps the Pleos SDKs for a simulated car (Fake ports) */
-    val demoMode: Flow<Boolean> = store.data.map { it[DEMO] ?: false }
+    val demoMode: Flow<Boolean> = store.data.map { it[DEMO] ?: BuildConfig.DEMO_BY_DEFAULT }
 
     /** Demo car speed multiplier: 1 or 5 */
     val demoSpeed: Flow<Int> = store.data.map { it[DEMO_SPEED] ?: 1 }

@@ -29,6 +29,16 @@ local.properties
 
 # 주의: apk/ 폴더(제출용 release APK)는 커밋해야 하므로 *.apk를 무시하지 않는다.
 
+# Release signing keys (keep them outside the repo; path and passwords live in car-app/local.properties)
+*.jks
+*.keystore
+
+# Generated test and tool output
+coverage/
+test-results/
+playwright-report/
+**/test/generated/
+
 # IDE / OS
 .idea/
 .DS_Store
