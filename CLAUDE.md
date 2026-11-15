@@ -1,4 +1,4 @@
-# 나와 (nawa) — 스마트픽업 매니저
+# hey — 스마트픽업 매니저
 
 운전자가 누군가를 픽업하러 갈 때, 픽업 대상자(탑승자)가 차량 위치·도착 예정 시간·진행 상태를 실시간으로 보는 서비스.
 현대자동차그룹 차량용 앱 공모전(Pleos Playground) 출품작이다.
@@ -13,7 +13,7 @@
 | `car-app/` | Kotlin, Jetpack Compose, Pleos Connect SDK (minSdk 28, Gradle 8+) | MVP (데모 모드, 운전자 지도, 메시지 TTS, 문 탑승 판정) |
 | `server/` | NestJS (TypeScript), socket.io, 나중에 PostgreSQL·Redis, yarn 4 | MVP (메모리 저장소) |
 | `web/` | React + Vite + TypeScript + Tailwind v4 + shadcn/ui, yarn 4 | 더미 데이터로 동작 |
-| `apk/` | 제출용 release APK (`팀명_nawa_release.apk`) | |
+| `apk/` | 제출용 release APK (`choi_hey_release.apk`) | |
 
 car-app SDK 버전 (`car-app/app/build.gradle.kts`):
 - `compileSdk = 37`: 사용하는 AndroidX 라이브러리(core 1.19, lifecycle 2.11)가 API 37 이상으로 컴파일해야 한다.
@@ -40,8 +40,10 @@ SDK 동작 근거는 `docs/sdk-findings.md`. 단일 Activity + Compose, 패키�
 - 서버·웹 주소는 빌드 변형별 `BuildConfig.SERVER_URL` / `WEB_BASE_URL`:
   - `debug`: 에뮬레이터용 `http://10.0.2.2:3000` / `:5173`
   - `local`: 맥북 IP. `car-app/local.properties`에 `nawa.devHost=192.168.x.x` → `./gradlew installLocal`
-  - `release`: 배포 주소(아직 미정, https만)
-- 평문 http는 debug/local의 개발 주소(와 카카오 지도 타일)에만 허용한다. release는 전부 차단.
+  - `release`: 1차 제출용으로 에뮬레이터 주소(`10.0.2.2`)를 그대로 쓴다. 배포 주소(https)는 나중에 바꾼다.
+    처음 실행할 때 데모 모드가 켜져 있다(`BuildConfig.DEMO_BY_DEFAULT`, 설정에서 끌 수 있음).
+    서명: 레포 밖 keystore, 경로·비밀번호는 `car-app/local.properties`의 `hey.release.*`. 결과는 `apk/choi_hey_release.apk`로 복사.
+- 평문 http는 각 빌드의 개발 주소(debug·release: `10.0.2.2`, local: 맥북 IP)와 카카오 지도 도메인에만 허용한다.
 - 운행 패널의 지도는 웹 `/d/{tripId}#token={driverToken}`을 WebView(MATCH_PARENT)로 띄운다. 토큰은 해시로 넘겨 서버 로그에 남지 않게 한다.
   운전자 지도는 차·정류지 상태를 `GET /trips/:tripId`로 3초마다 조회하고, 탑승자 위치·응답은 socket.io로 받는다.
 - 에뮬레이터 WebView는 `http://10.0.2.2:5173`에서 열리므로 서버 `CORS_ORIGIN`과 카카오 JavaScript 키 웹 도메인에 그 주소가 있어야 한다.
