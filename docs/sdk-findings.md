@@ -95,7 +95,7 @@
 | `http://10.0.2.2:5173` 웹 | 제한 | 처음엔 `ConnectException`. vite가 IPv6 `localhost`에만 떠 있어서다. `--host 127.0.0.1`로 띄우니 `200 in 26ms` | 에뮬레이터 테스트 때는 웹 dev 서버를 IPv4로 띄워야 한다 |
 | WebView 존재 | **가능** | provider=`ai.pleos.android.webview` 131.0.6752.0 | 앱 안 WebView를 쓸 수 있다 |
 | WebView로 탑승자 웹 표시 | **가능 (조건 있음)** | 처음엔 회색 화면만 보임: 페이지는 로드됐지만 `100dvh`/`100vh`가 **0px**로 계산됨. WebView를 `MATCH_PARENT`로 지정하자 `frame=440px`, 화면 정상 표시 | Compose `AndroidView`의 기본 `WRAP_CONTENT` 때문이다. **WebView는 반드시 `MATCH_PARENT`로 넣는다**(검증 코드에 반영함) |
-| WebView 안 카카오맵 | 미확인 | `net::ERR_CLEARTEXT_NOT_PERMITTED http://dapi.kakao.com/…` (http 페이지라 SDK도 http로 요청 → 앱의 평문 허용 범위 밖) | https 배포 환경에서는 생기지 않는 문제다. 카카오 JS 키에 WebView가 여는 도메인도 등록해야 한다 |
+| WebView 안 카카오맵 | 가능 (debug·local 설정 필요) | 페이지가 http면 SDK 로더(`dapi.kakao.com`, 웹에서 https로 고정)가 지도 본체를 `http://t1.kakaocdn.net/mapjsapi/js/main/…/kakao.js`로, 타일을 `http://mts.kakaocdn.net/…`으로 불러온다. 평문 허용 목록에 `kakaocdn.net`이 없으면 `ERR_CLEARTEXT_NOT_PERMITTED`로 막혀 지도 영역이 회색으로 멈춘다. `kakaocdn.net`, `daumcdn.net`, `kakao.com`을 허용하자 타일 33장 로드, 정상 표시 | debug·local 빌드의 network_security_config에 위 세 도메인을 둔다. release는 https 페이지라 해당 없음. 카카오 JavaScript 키 웹 도메인에 WebView가 여는 주소(`http://10.0.2.2:5173` 등) 등록 필요 |
 
 ### 7. 6단계 추가 검증 (탑승자 메시지, 문 판정, 주행 중 입력)
 
