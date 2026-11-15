@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug (emulator): plain HTTP only to the MacBook as seen from the emulator (10.0.2.2) -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Kakao map tiles on an http dev page -->
+        <domain includeSubdomains="true">daumcdn.net</domain>
+        <domain includeSubdomains="true">kakao.com</domain>
+    </domain-config>
+</network-security-config>

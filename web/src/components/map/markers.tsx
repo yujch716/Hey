@@ -21,9 +21,9 @@ export function CarMarker({ heading }: { heading: number }) {
   )
 }
 
-export function StopPin({ stop, passed }: { stop: Stop; passed: boolean }) {
+export function StopPin({ stop, passed, label = stopLabel(stop) }: { stop: Stop; passed: boolean; label?: string }) {
   return (
-    <div className="flex -translate-x-1/2 -translate-y-[15px] flex-col items-center" aria-label={`${stop.order}번 정류지 ${stopLabel(stop)}`}>
+    <div className="flex -translate-x-1/2 -translate-y-[15px] flex-col items-center" aria-label={`${stop.order}번 정류지 ${label}`}>
       <span
         className={cn(
           'grid size-[30px] place-items-center rounded-full border-[3px] text-[13px] font-extrabold shadow-[0_1px_4px_rgba(26,36,51,0.3)]',
@@ -40,7 +40,7 @@ export function StopPin({ stop, passed }: { stop: Stop; passed: boolean }) {
           passed && !stop.isMine && 'opacity-45',
         )}
       >
-        {stopLabel(stop)}
+        {label}
       </span>
     </div>
   )
@@ -51,6 +51,21 @@ export function MeDot() {
     <div className="relative -translate-x-1/2 -translate-y-1/2" aria-label="내 현재 위치">
       <span className="absolute inset-0 rounded-full bg-route/40 [animation:halo_2s_ease-out_infinite]" />
       <span className="relative block size-4 rounded-full border-[3px] border-white bg-route shadow-[0_1px_4px_rgba(26,36,51,0.35)]" />
+    </div>
+  )
+}
+
+/** A passenger's shared position (blue) or the spot they asked the driver to come to (yellow). */
+export function LabeledPin({ label, tone }: { label: string; tone: 'passenger' | 'wait' }) {
+  return (
+    <div className="flex -translate-x-1/2 -translate-y-[9px] flex-col items-center" aria-label={label}>
+      <span
+        className={cn(
+          'block size-[18px] rounded-full border-[3px] border-white shadow-[0_1px_4px_rgba(26,36,51,0.35)]',
+          tone === 'wait' ? 'bg-signal' : 'bg-route',
+        )}
+      />
+      <span className="mt-1 whitespace-nowrap rounded-md bg-ink px-1.5 py-0.5 text-[11px] font-semibold text-white">{label}</span>
     </div>
   )
 }

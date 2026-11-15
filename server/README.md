@@ -30,6 +30,25 @@ yarn watch-share <token> [late]  # 탑승자처럼 GET /share/:token 후 socket.
 - 탑승자 응답이 오면 `fake-driver` 콘솔에 TTS로 읽을 문장이 찍힌다.
 - `TICK_MS=500 yarn fake-driver`처럼 간격을 줄이면 빨리 돌려 볼 수 있다. `SERVER_URL`로 서버 주소를 바꾼다.
 
+### 실제 폰(또는 실차)으로 테스트하기
+
+폰과 맥북이 같은 Wi-Fi에 있어야 한다. 맥북 IP는 `ipconfig getifaddr en0`로 확인한다(예: `192.168.0.10`).
+
+1. `server/.env`
+   ```
+   WEB_BASE_URL=http://192.168.0.10:5173        # 공유 링크·QR이 이 주소로 나온다
+   CORS_ORIGIN=http://localhost:5173,http://192.168.0.10:5173,http://10.0.2.2:5173
+   ```
+   서버를 다시 시작한다(`yarn start`). 서버는 모든 인터페이스(`*:3000`)에서 받는다.
+2. 웹: `cd web && yarn dev --host` (같은 네트워크의 폰이 `http://192.168.0.10:5173`로 접속할 수 있게)
+   - 웹은 `VITE_API_BASE_URL`이 비어 있으면 페이지를 연 호스트의 3000번 포트를 서버로 쓴다. 폰에서 IP로 열면 서버도 IP로 찾아간다.
+3. 차량 앱: `car-app/local.properties`에 `nawa.devHost=192.168.0.10`을 넣고 `./gradlew installLocal`
+   (debug 빌드는 에뮬레이터용 `10.0.2.2`를 쓴다)
+4. 카카오맵을 쓰려면 카카오 개발자 콘솔의 JavaScript 키 웹 도메인에 `http://192.168.0.10:5173`을 추가한다.
+   에뮬레이터 WebView로 보려면 `http://10.0.2.2:5173`도 추가한다.
+
+주의: 폰 브라우저는 https가 아닌 주소에서 위치 권한을 막는다. 탑승자 위치 공유는 이 방법으로는 시험할 수 없다.
+
 ### 테스트
 
 ```bash
@@ -47,7 +66,7 @@ yarn test
 | 키 | 기본값 | 설명 |
 | --- | --- | --- |
 | `PORT` | `3000` | |
-| `CORS_ORIGIN` | `http://localhost:5173` | HTTP와 socket.io 둘 다. 쉼표로 여러 개 |
+| `CORS_ORIGIN` | `http://localhost:5173` | HTTP와 socket.io 둘 다. 쉼표로 여러 개. 차량 앱 WebView는 `http://10.0.2.2:5173`(에뮬레이터)이나 맥북 IP에서 열린다 |
 | `WEB_BASE_URL` | `http://localhost:5173` | 공유 링크 = `WEB_BASE_URL/t/{token}` |
 | `KAKAO_REST_API_KEY` | (없음) | 카카오모빌리티 길찾기·카카오 로컬 검색. 없으면 직선 대체 경로·더미 장소 |
 

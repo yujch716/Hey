@@ -4,13 +4,13 @@ import { cn } from '@/lib/utils'
 import type { LatLng } from '@/types'
 
 import { splitRoute, type MapViewProps } from './MapView'
-import { CarMarker, MeDot, StopPin } from './markers'
+import { CarMarker, LabeledPin, MeDot, StopPin } from './markers'
 
 /**
  * Offline stand-in for the Kakao map: a drawn street grid with the same overlays.
  * Used when VITE_KAKAO_MAP_KEY is not set, so the page works (and screenshots) without a key.
  */
-export function MockMapView({ route, stops, snapshot, me }: MapViewProps) {
+export function MockMapView({ route, stops, snapshot, me, labelOf, pins = [] }: MapViewProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 400, h: 400 })
   const [animate, setAnimate] = useState(false)
@@ -29,7 +29,7 @@ export function MockMapView({ route, stops, snapshot, me }: MapViewProps) {
   }, [])
 
   const project = useMemo(() => {
-    const pts = me ? [...route, me] : route
+    const pts = [...route, ...(me ? [me] : []), ...pins.map((p) => p.position)]
     const lats = pts.map((p) => p.lat)
     const lngs = pts.map((p) => p.lng)
     const minLat = Math.min(...lats), maxLat = Math.max(...lats)
@@ -39,7 +39,7 @@ export function MockMapView({ route, stops, snapshot, me }: MapViewProps) {
     const pad = 0.72
     const s = Math.min((size.w * pad) / ((maxLng - minLng) * kx), (size.h * pad) / (maxLat - minLat))
     return (p: LatLng) => ({ x: (p.lng - cLng) * kx * s + size.w / 2, y: -(p.lat - cLat) * s + size.h / 2 })
-  }, [route, me, size])
+  }, [route, me, pins, size])
 
   const { traveled, toMe, later } = splitRoute(route, stops, snapshot)
   const toPath = (pts: LatLng[]) =>
@@ -78,10 +78,16 @@ export function MockMapView({ route, stops, snapshot, me }: MapViewProps) {
         const p = project(s.position)
         return (
           <div key={s.id} className="absolute left-0 top-0" style={{ transform: `translate(${p.x}px, ${p.y}px)` }}>
-            <StopPin stop={s} passed={s.order < passedOrder} />
+            <StopPin stop={s} passed={s.order < passedOrder} label={labelOf?.(s)} />
           </div>
         )
       })}
+
+      {pins.map((pin) => (
+        <div key={pin.key} className="absolute left-0 top-0" style={{ transform: `translate(${project(pin.position).x}px, ${project(pin.position).y}px)` }}>
+          <LabeledPin label={pin.label} tone={pin.tone} />
+        </div>
+      ))}
 
       {me && (
         <div className="absolute left-0 top-0" style={{ transform: `translate(${project(me).x}px, ${project(me).y}px)` }}>

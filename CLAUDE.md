@@ -10,7 +10,7 @@
 
 | 폴더 | 내용 | 상태 |
 | --- | --- | --- |
-| `car-app/` | Kotlin, Jetpack Compose, Pleos Connect SDK (minSdk 28, Gradle 8+) | MVP (데모 모드 지원, 지도·문 감지·TTS는 6단계) |
+| `car-app/` | Kotlin, Jetpack Compose, Pleos Connect SDK (minSdk 28, Gradle 8+) | MVP (데모 모드, 운전자 지도 WebView. 문 감지·TTS는 6단계) |
 | `server/` | NestJS (TypeScript), socket.io, 나중에 PostgreSQL·Redis, yarn 4 | MVP (메모리 저장소) |
 | `web/` | React + Vite + TypeScript + Tailwind v4 + shadcn/ui, yarn 4 | 더미 데이터로 동작 |
 | `apk/` | 제출용 release APK (`팀명_nawa_release.apk`) | |
@@ -35,7 +35,14 @@ SDK 동작 근거는 `docs/sdk-findings.md`. 단일 Activity + Compose, 패키�
 | `ui/` | 차량 등록 → 운행 준비 → 공유(QR) → 운행 패널, 설정 |
 | `sdkcheck/` | 3단계 SDK 검증 화면. 설정 > SDK 진단 |
 
-- 서버 주소는 `BuildConfig.SERVER_URL`(기본 `http://10.0.2.2:3000`, 에뮬레이터에서 맥북). 평문 http는 `10.0.2.2`만 허용.
+- 서버·웹 주소는 빌드 변형별 `BuildConfig.SERVER_URL` / `WEB_BASE_URL`:
+  - `debug`: 에뮬레이터용 `http://10.0.2.2:3000` / `:5173`
+  - `local`: 맥북 IP. `car-app/local.properties`에 `nawa.devHost=192.168.x.x` → `./gradlew installLocal`
+  - `release`: 배포 주소(아직 미정, https만)
+- 평문 http는 debug/local의 개발 주소(와 카카오 지도 타일)에만 허용한다. release는 전부 차단.
+- 운행 패널의 지도는 웹 `/d/{tripId}#token={driverToken}`을 WebView(MATCH_PARENT)로 띄운다. 토큰은 해시로 넘겨 서버 로그에 남지 않게 한다.
+  운전자 지도는 차·정류지 상태를 `GET /trips/:tripId`로 3초마다 조회하고, 탑승자 위치·응답은 socket.io로 받는다.
+- 에뮬레이터 WebView는 `http://10.0.2.2:5173`에서 열리므로 서버 `CORS_ORIGIN`과 카카오 JavaScript 키 웹 도메인에 그 주소가 있어야 한다.
 - 공유 QR은 웹의 `/send/{token}`을 연다. 운전자 폰에서 공유 시트로 `/t/{token}`을 보낸다.
 - 픽업 정류지 라벨은 서버에 `픽업`으로 보내고, 내비 목적지 이름은 `N번 정류지`로 넣는다(탑승자 이름 없음).
 - 테스트: `./gradlew testDebugUnitTest` (TripController, DemoDrive).

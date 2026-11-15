@@ -1,7 +1,13 @@
 import type { TripState } from '@/hooks/tripSource'
 import type { LatLng, QuickReply, Trip, TripSnapshot } from '@/types'
 
-const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:3000').replace(/\/$/, '')
+/**
+ * Without VITE_API_BASE_URL the server is assumed on port 3000 of whatever host served this page,
+ * so the same dev build works from localhost, the emulator's WebView (10.0.2.2) and a phone (MacBook IP).
+ */
+export const API_BASE_URL = (
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) || `${window.location.protocol}//${window.location.hostname}:3000`
+).replace(/\/$/, '')
 export const WS_URL = ((import.meta.env.VITE_WS_URL as string | undefined) || API_BASE_URL).replace(/\/$/, '')
 
 export type ShareResult = Exclude<TripState, { status: 'loading' }>
