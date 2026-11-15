@@ -111,4 +111,43 @@ class DemoDriveTest {
         repeat(200) { d.step(1.0) }
         assertEquals(0.0, Geo.distance(close, d.fix.value.position), 1.0)
     }
+
+    @Test
+    fun `parks where the built-in navi is, but not once a route is loaded`() = runTest {
+        val navi = LatLng(37.5, 127.02)
+        val d = DemoDrive(TestScope())
+        d.placeAt(navi)
+        assertEquals(0.0, Geo.distance(navi, d.fix.value.position), 0.5)
+
+        d.load(listOf(start, middle, end))
+        d.placeAt(navi)
+        assertEquals(0.0, Geo.distance(start, d.fix.value.position), 0.5)
+    }
+
+    /** Records what the built-in navi was asked to do */
+    private class RecordingNavi : com.choi.nawa.port.NaviPort {
+        val calls = mutableListOf<String>()
+        override val arrivals = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+        override suspend fun start() {}
+        override fun requestRoute(name: String, position: LatLng) { calls += "route $name" }
+        override fun cancelRoute() { calls += "cancel" }
+        override suspend fun destination(): com.choi.nawa.port.NaviDestination? = null
+        override suspend fun currentLocation(): com.choi.nawa.port.Fix? = null
+        override fun release() {}
+    }
+
+    @Test
+    fun `demo navi drives the demo car and mirrors destinations to the built-in navi`() = runTest {
+        val d = DemoDrive(TestScope()).apply { load(listOf(start, middle, end)) }
+        val builtIn = RecordingNavi()
+        val navi = DemoNaviWithBuiltIn(FakeNavi(d), builtIn)
+
+        navi.requestRoute("1번 정류지", middle)
+        assertTrue(d.isMoving)
+        navi.requestRoute("2번 정류지", end)
+        navi.cancelRoute()
+
+        assertFalse(d.isMoving)
+        assertEquals(listOf("route 1번 정류지", "route 2번 정류지", "cancel"), builtIn.calls)
+    }
 }

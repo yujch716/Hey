@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.choi.nawa.data.StopKind
@@ -179,6 +181,17 @@ private fun StopEntry(stop: StopProgress, style: NodeStyle, eta: Int?, reply: Re
             current -> Text("가는 중", style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
             eta != null -> Text(etaText(eta), style = MaterialTheme.typography.labelLarge, color = Palette.Muted)
         }
+    }
+    // Pickups show only "픽업" (no passenger name), so the address tells the driver which place it is
+    if (stop.kind == StopKind.PICKUP && stop.address.isNotBlank()) {
+        Text(
+            stop.address,
+            Modifier.padding(start = 40.dp).offset(y = (-10).dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = Palette.Muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
     if (stop.passengerLocation != null && style != NodeStyle.DONE) {
         Text("위치 공유 중", style = MaterialTheme.typography.labelLarge, color = Palette.Route)

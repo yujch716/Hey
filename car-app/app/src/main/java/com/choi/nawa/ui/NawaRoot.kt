@@ -36,6 +36,7 @@ import com.choi.nawa.sdkcheck.SdkCheckScreen
 import com.choi.nawa.sdkcheck.TtsProbe
 import com.choi.nawa.sdkcheck.VehicleProbe
 import com.choi.nawa.port.Gear
+import com.choi.nawa.port.RouteRequest
 import com.choi.nawa.trip.TripPhase
 import com.choi.nawa.ui.theme.Palette
 import kotlinx.coroutines.launch
@@ -60,6 +61,7 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
     val vehicleLoad by container.settings.vehicle.collectAsState(initial = Loading)
     val demo by container.settings.demoMode.collectAsState(initial = false)
     val demoSpeed by container.settings.demoSpeed.collectAsState(initial = 1)
+    val demoBuiltInNavi by container.settings.demoBuiltInNavi.collectAsState(initial = true)
     val controller by container.trip.collectAsState()
     val tripState = controller?.state?.collectAsState()?.value
     val active by container.active.collectAsState()
@@ -69,8 +71,8 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
     val driving = gear == Gear.DRIVE || gear == Gear.REVERSE || gear == Gear.NEUTRAL
     var overlay by remember { mutableStateOf<Overlay?>(null) }
 
-    // Ports start once location permissions are settled (and again when demo mode flips)
-    LaunchedEffect(permissionsReady, demo) {
+    // Ports start once location permissions are settled (and again when a demo setting flips)
+    LaunchedEffect(permissionsReady, demo, demoBuiltInNavi) {
         if (permissionsReady && controller == null) container.ports()
     }
 
@@ -78,14 +80,26 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
         overlay = if (overlay == Overlay.Settings) null else Overlay.Settings
     }
 
+    // Each new stop asks before the built-in navi takes the screen (a window over whatever screen is showing)
+    val routePrompt = active?.routePrompt
+    val noPrompt = remember { kotlinx.coroutines.flow.MutableStateFlow<RouteRequest?>(null) }
+    val asking by (routePrompt?.pending ?: noPrompt).collectAsState()
+    asking?.let { r ->
+        // The navi only knows name and position; the address comes from the trip's stop at that position
+        val address = tripState?.stops?.firstOrNull { it.position == r.position }?.address.orEmpty()
+        RoutePromptDialog(r, address, onYes = { routePrompt?.confirm() }, onNo = { routePrompt?.dismiss() })
+    }
+
     when (overlay) {
         Overlay.Settings -> {
             SettingsScreen(
                 demo = demo,
                 demoSpeed = demoSpeed,
+                demoBuiltInNavi = demoBuiltInNavi,
                 tripRunning = tripState?.phase == TripPhase.DRIVING || tripState?.phase == TripPhase.PLANNED,
                 onDemo = { scope.launch { container.settings.setDemoMode(it) } },
                 onSpeed = { scope.launch { container.settings.setDemoSpeed(it) } },
+                onDemoBuiltInNavi = { scope.launch { container.settings.setDemoBuiltInNavi(it) } },
                 onEditVehicle = { overlay = Overlay.EditVehicle },
                 onSdkCheck = { overlay = Overlay.SdkCheck },
                 onPermissions = onRequestPermissions,
@@ -169,9 +183,11 @@ private object Loading
 private fun SettingsScreen(
     demo: Boolean,
     demoSpeed: Int,
+    demoBuiltInNavi: Boolean,
     tripRunning: Boolean,
     onDemo: (Boolean) -> Unit,
     onSpeed: (Int) -> Unit,
+    onDemoBuiltInNavi: (Boolean) -> Unit,
     onEditVehicle: () -> Unit,
     onSdkCheck: () -> Unit,
     onPermissions: () -> Unit,
@@ -194,7 +210,23 @@ private fun SettingsScreen(
             if (demo) {
                 Row(Modifier.padding(top = 16.dp), horizontalArrangement = Gap, verticalAlignment = Alignment.CenterVertically) {
                     Text("데모 속도", style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
-                    for (x in listOf(1, 5)) ChoiceChip("${x}x", selected = demoSpeed == x) { onSpeed(x) }
+                    for (x in listOf(1, 3, 5)) ChoiceChip("${x}x", selected = demoSpeed == x) { onSpeed(x) }
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = TouchHeight), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("데모 모드에서 내장 내비 실행", style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+                        Text(
+                            if (tripRunning) "운행 중에는 바꿀 수 없어요" else "정류지마다 내장 내비에도 목적지를 넣어요. 차는 가상 차량이 움직여요",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Palette.Muted,
+                        )
+                    }
+                    Switch(
+                        checked = demoBuiltInNavi,
+                        onCheckedChange = onDemoBuiltInNavi,
+                        enabled = !tripRunning,
+                        modifier = Modifier.scale(1.4f).padding(end = 12.dp),
+                    )
                 }
             }
             if (fakeVehicle != null) DemoVehicleControls(fakeVehicle)

@@ -24,16 +24,21 @@ class SettingsStore(context: Context) {
     /** Demo mode swaps the Pleos SDKs for a simulated car (Fake ports) */
     val demoMode: Flow<Boolean> = store.data.map { it[DEMO] ?: BuildConfig.DEMO_BY_DEFAULT }
 
-    /** Demo car speed multiplier: 1 or 5 */
+    /** Demo car speed multiplier: 1, 3 or 5 */
     val demoSpeed: Flow<Int> = store.data.map { it[DEMO_SPEED] ?: 1 }
+
+    /** Demo mode also routes the built-in navi (so it shows on screen); the simulated car still drives the trip */
+    val demoBuiltInNavi: Flow<Boolean> = store.data.map { it[DEMO_BUILT_IN_NAVI] ?: true }
 
     suspend fun saveVehicle(v: VehicleProfile) = store.edit { it[VEHICLE] = NawaJson.encodeToString(v) }
     suspend fun setDemoMode(on: Boolean) = store.edit { it[DEMO] = on }
     suspend fun setDemoSpeed(x: Int) = store.edit { it[DEMO_SPEED] = x }
+    suspend fun setDemoBuiltInNavi(on: Boolean) = store.edit { it[DEMO_BUILT_IN_NAVI] = on }
 
     private companion object {
         val VEHICLE = stringPreferencesKey("vehicle")
         val DEMO = booleanPreferencesKey("demo_mode")
         val DEMO_SPEED = intPreferencesKey("demo_speed")
+        val DEMO_BUILT_IN_NAVI = booleanPreferencesKey("demo_built_in_navi")
     }
 }
