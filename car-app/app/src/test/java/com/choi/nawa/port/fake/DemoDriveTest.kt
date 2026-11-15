@@ -60,5 +60,55 @@ class DemoDriveTest {
         d.step(60.0)
         assertEquals(start, d.fix.value.position)
     }
-}
 
+    private fun planned(order: Int, kind: com.choi.nawa.data.StopKind, routeIndex: Int, p: LatLng) =
+        com.choi.nawa.data.PlannedStop(order, kind, "", p, routeIndex, 0, 0)
+
+    @Test
+    fun `at a waypoint it waits 10 s, then drives off on its own without passing the next stop`() = runTest {
+        val far = LatLng(37.5100, 127.03) // ~1.2 km past the cafe
+        val d = DemoDrive(TestScope()).apply {
+            load(
+                listOf(start, middle, end, far),
+                listOf(planned(1, com.choi.nawa.data.StopKind.WAYPOINT, 1, middle), planned(2, com.choi.nawa.data.StopKind.PICKUP, 3, far)),
+            )
+        }
+        d.driveTo("카페", middle)
+        while (d.isMoving) d.step(0.5) // drive to the cafe
+        assertEquals(0.0, Geo.distance(middle, d.fix.value.position), 1.0)
+
+        repeat(18) { d.step(0.5) } // 9 s later: still parked
+        assertEquals(0.0, Geo.distance(middle, d.fix.value.position), 1.0)
+        assertFalse(d.isMoving)
+
+        repeat(4) { d.step(0.5) } // past 10 s: rolls on
+        repeat(60) { d.step(1.0) }
+        val rolled = Geo.distance(middle, d.fix.value.position)
+        assertTrue("rolled $rolled m", rolled > 150 && rolled <= DEMO_ROLL_M + 1)
+    }
+
+    @Test
+    fun `a pickup does not drive off by itself`() = runTest {
+        val d = DemoDrive(TestScope()).apply {
+            load(listOf(start, middle, end), listOf(planned(1, com.choi.nawa.data.StopKind.PICKUP, 1, middle)))
+        }
+        d.driveTo("1번 정류지", middle)
+        repeat(200) { d.step(1.0) }
+        assertEquals(0.0, Geo.distance(middle, d.fix.value.position), 1.0)
+    }
+
+    @Test
+    fun `rolling on stops short of a nearby next stop`() = runTest {
+        // Next stop only ~100 m after the cafe
+        val close = LatLng(37.4954, 127.03)
+        val d = DemoDrive(TestScope()).apply {
+            load(
+                listOf(start, middle, close, end),
+                listOf(planned(1, com.choi.nawa.data.StopKind.WAYPOINT, 1, middle), planned(2, com.choi.nawa.data.StopKind.PICKUP, 2, close)),
+            )
+        }
+        d.driveTo("카페", middle)
+        repeat(200) { d.step(1.0) }
+        assertEquals(0.0, Geo.distance(close, d.fix.value.position), 1.0)
+    }
+}

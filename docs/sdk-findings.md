@@ -95,7 +95,17 @@
 | `http://10.0.2.2:5173` 웹 | 제한 | 처음엔 `ConnectException`. vite가 IPv6 `localhost`에만 떠 있어서다. `--host 127.0.0.1`로 띄우니 `200 in 26ms` | 에뮬레이터 테스트 때는 웹 dev 서버를 IPv4로 띄워야 한다 |
 | WebView 존재 | **가능** | provider=`ai.pleos.android.webview` 131.0.6752.0 | 앱 안 WebView를 쓸 수 있다 |
 | WebView로 탑승자 웹 표시 | **가능 (조건 있음)** | 처음엔 회색 화면만 보임: 페이지는 로드됐지만 `100dvh`/`100vh`가 **0px**로 계산됨. WebView를 `MATCH_PARENT`로 지정하자 `frame=440px`, 화면 정상 표시 | Compose `AndroidView`의 기본 `WRAP_CONTENT` 때문이다. **WebView는 반드시 `MATCH_PARENT`로 넣는다**(검증 코드에 반영함) |
-| WebView 안 카카오맵 | 미확인 | `net::ERR_CLEARTEXT_NOT_PERMITTED http://dapi.kakao.com/…` (http 페이지라 SDK도 http로 요청 → 앱의 평문 허용 범위 밖) | https 배포 환경에서는 생기지 않는 문제다. 카카오 JS 키에 WebView가 여는 도메인도 등록해야 한다 |
+| WebView 안 카카오맵 | 가능 (debug·local 설정 필요) | 페이지가 http면 SDK 로더(`dapi.kakao.com`, 웹에서 https로 고정)가 지도 본체를 `http://t1.kakaocdn.net/mapjsapi/js/main/…/kakao.js`로, 타일을 `http://mts.kakaocdn.net/…`으로 불러온다. 평문 허용 목록에 `kakaocdn.net`이 없으면 `ERR_CLEARTEXT_NOT_PERMITTED`로 막혀 지도 영역이 회색으로 멈춘다. `kakaocdn.net`, `daumcdn.net`, `kakao.com`을 허용하자 타일 33장 로드, 정상 표시 | debug·local 빌드의 network_security_config에 위 세 도메인을 둔다. release는 https 페이지라 해당 없음. 카카오 JavaScript 키 웹 도메인에 WebView가 여는 주소(`http://10.0.2.2:5173` 등) 등록 필요 |
+
+### 7. 6단계 추가 검증 (탑승자 메시지, 문 판정, 주행 중 입력)
+
+| 항목 | 결과 | 실제 반환값 예시 | 우리 설계에 미치는 영향 |
+| --- | --- | --- | --- |
+| 메시지를 TTS로 순서대로 읽기 | 가능 | 세 메시지가 겹치지 않고 재생됨(오디오 플레이어 38.9→41.8초, 41.9→44.1초, 44.1→47.3초). 같은 메시지를 10초 안에 다시 보내면 재생 안 됨 | `TtsPort.speak`가 `onDone`까지 기다리게 하고 큐로 하나씩 읽는다. 데모 모드도 Pleos TTS(ON_DEVICE)를 쓴다 |
+| 서비스에서 운행 패널 Activity를 앞으로 띄우기 | **제한** | 첫 시도는 OS가 막음: `Background activity launch blocked … callingUidProcState: FOREGROUND_SERVICE … (BAL_BLOCK)`. 두 번의 실행 모두 헤드업 알림을 한 번 띄운 뒤의 메시지에서는 앱이 앞으로 왔다 | 포그라운드 서비스만으로는 Android 14의 백그라운드 실행 예외가 아니다. **띄우기를 시도하고, 3초 안에 앞에 없으면 헤드업 알림**(중요도 높음 채널 `replies`, 누르면 운행 패널)으로 보여준다. 알림은 `dumpsys notification`에서 `importance=4`로 게시된 것을 확인했고, 화면에 헤드업으로 뜨는 모습은 캡처하지 못했다 |
+| 문 열림으로 탑승 판정 (데모 `FakeVehicle`) | 가능 | 2번 정류지 도착 후 조수석 열기→닫기 → 3초 뒤 `stopCompleted(by: door)` → 3번으로 `requestRoute`, 안내 음성 재생. 운전석 문만 열고 닫으면 6초가 지나도 완료되지 않음. 마지막 정류지는 "운행을 마쳤어요" 후 서비스 종료 | 실제 문 이벤트(`registerDoorPosition`)는 3단계에서 확인한 대로 문별 0/1로 온다. Virtual Console로 실제 이벤트를 넣어 보는 확인은 남아 있다 |
+| 주행 중 입력 제한 | 가능 | 데모 기어 D에서 운행 준비 화면에 "정차 중에만 입력할 수 있어요", 검색창·검색·운행 시작 비활성 | 기어는 `VehiclePort.gear`(Pleos: `registerGearSelection`). 운행 패널의 큰 버튼은 주행 중에도 누를 수 있고 [운행 종료]는 막힌다 |
+| Pleos Virtual Console | 미확인 | Virtual Console 사용 가이드에 Door Position(문별 열림)·Gear Selection(P/R/N/D) 카드가 있다. 연결(설정) 가이드는 문서 사이트에서 찾지 못했다 | 실차 같은 문·기어 이벤트 확인은 Virtual Console을 연결해서 해야 한다(아래 "직접 확인할 것") |
 
 ### 화면 구성 (관찰)
 
@@ -116,6 +126,8 @@
 ## 직접 확인할 것
 
 - [ ] **멀티 윈도우**: 이 앱과 내비가 나란히 뜨는지. 관찰상 둘은 같은 메인 영역을 번갈아 쓰고, `requestRoute` 때 내비가 앞으로 나온다. 분할 화면 방법이 있는지 확인이 필요하다
+- [ ] **6단계 실제 모드 탑승 판정**: 실제 모드(데모 끔)로 운행하고 2번 정류지 도착 후 Virtual Console의 Door Position에서 조수석이나 뒷좌석 문을 열었다 닫으면 3초 뒤 자동으로 다음 정류지로 넘어가는지. 운전석(앞 왼쪽)만 열고 닫으면 넘어가지 않아야 한다
+- [ ] **헤드업 알림 모양**: 앱이 뒤에 있을 때 탑승자 메시지가 오면 화면 위에 헤드업 알림이 보이는지, 누르면 운행 패널이 열리는지
 - [ ] **Virtual Console로 문 열기/닫기**: 검증 앱에서 Vehicle `initialize` → "문 콜백 등록"을 누른 뒤 문을 바꾸면 `adb logcat -s NAWA_SDK`에 `◀ door ROW_2_RIGHT position=1`처럼 찍히는지
 - [ ] **Virtual Console로 기어 변경**: "기어·브레이크 콜백 등록" 후 P→D로 바꾸면 `◀ gear=GEAR_DRIVE`가 찍히는지. D에서 AAOS 주행 중 UX 제한으로 우리 화면이 막히는지
 - [ ] **차량 위치 움직이기**

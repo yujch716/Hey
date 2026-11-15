@@ -19,9 +19,10 @@ fun cleartextConfigFor(host: String) = """<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">$host</domain>
-        <!-- Kakao map tiles on an http dev page -->
+        <!-- Kakao map script (t1.kakaocdn.net) and tiles (daumcdn.net), requested over http by an http dev page -->
         <domain includeSubdomains="true">daumcdn.net</domain>
         <domain includeSubdomains="true">kakao.com</domain>
+        <domain includeSubdomains="true">kakaocdn.net</domain>
     </domain-config>
 </network-security-config>
 """

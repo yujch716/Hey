@@ -2,6 +2,7 @@ package com.choi.nawa.trip
 
 import com.choi.nawa.data.CreateStop
 import com.choi.nawa.data.CreateTripRequest
+import com.choi.nawa.data.CreateTripResponse
 import com.choi.nawa.data.DriverChannel
 import com.choi.nawa.data.EventBody
 import com.choi.nawa.data.Geo
@@ -15,11 +16,18 @@ import com.choi.nawa.data.StopDraft
 import com.choi.nawa.data.StopKind
 import com.choi.nawa.data.TripApi
 import com.choi.nawa.data.VehicleProfile
+import com.choi.nawa.port.Door
 import com.choi.nawa.port.Fix
 import com.choi.nawa.port.Ports
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -45,7 +53,18 @@ data class StopProgress(
     val passengerLocation: LatLng? = null,
 )
 
-data class ReplyLog(val stopOrder: Int, val type: String, val atMs: Long, val position: LatLng?)
+data class ReplyLog(val stopOrder: Int, val type: String, val atMs: Long, val position: LatLng?) {
+    /** What the car reads out and lists on the panel */
+    val text get() = replyMessage(stopOrder, type)
+}
+
+/** Passenger quick replies, as spoken in the car. Messages only: they never change the trip. */
+fun replyMessage(stopOrder: Int, type: String) = when (type) {
+    "out" -> "${stopOrder}번 탑승자가 나왔대요"
+    "late" -> "${stopOrder}번 탑승자가 5분 늦는대요"
+    "waitHere" -> "${stopOrder}번 탑승자가 지금 있는 곳에서 기다린대요"
+    else -> "${stopOrder}번 탑승자가 메시지를 보냈어요"
+}
 
 data class TripState(
     val tripId: String,
@@ -82,14 +101,27 @@ class TripController(
     private val channel: DriverChannel,
     private val ports: Ports,
     private val clock: () -> Long = System::currentTimeMillis,
-    /** The demo car needs the planned route to drive along */
-    private val onRoutePlanned: (List<LatLng>) -> Unit = {},
+    /** The demo car needs the planned route (and which stops are waypoints) to drive along. No-op in real mode. */
+    private val onRoutePlanned: (CreateTripResponse) -> Unit = {},
 ) {
     private val _state = MutableStateFlow<TripState?>(null)
     val state: StateFlow<TripState?> = _state.asStateFlow()
 
     // Buttons, arrival detection and the tick all touch the current stop; one at a time
     private val stopLock = Mutex()
+
+    /** Each passenger reply as it arrives, so the app can come to the front (TripService) */
+    private val _replyEvents = MutableSharedFlow<ReplyLog>(extraBufferCapacity = 8)
+    val replyEvents: SharedFlow<ReplyLog> = _replyEvents.asSharedFlow()
+
+    // Speech is queued and read one at a time by the loop, so messages never talk over each other
+    private val speech = Channel<String>(Channel.UNLIMITED)
+    private val lastSpokenAt = mutableMapOf<Pair<Int, String>, Long>()
+
+    // Door-based boarding: a passenger door opened, then everything closed for DOOR_CLOSED_HOLD_MS
+    private var doorStopOrder: Int? = null
+    private var passengerDoorOpened = false
+    private var doorHold: Job? = null
 
     suspend fun create(vehicle: VehicleProfile, drafts: List<StopDraft>) {
         require(drafts.isNotEmpty()) { "정류지를 하나 이상 넣어 주세요" }
@@ -100,7 +132,7 @@ class TripController(
             CreateStop(order = i + 1, kind = d.kind, label = labelFor(d), position = d.place.position)
         }
         val res = api.createTrip(CreateTripRequest(vehicle, origin, stops))
-        onRoutePlanned(res.route)
+        onRoutePlanned(res)
         _state.value = TripState(
             tripId = res.tripId,
             driverToken = res.driverToken,
@@ -124,14 +156,21 @@ class TripController(
 
     /** The foreground service runs this while the trip is underway. Returns when the trip ends. */
     suspend fun runLoop() = coroutineScope {
-        val fixes = launch { ports.location.fixes.collect { onFix(it) } }
-        val arrivals = launch { ports.navi.arrivals.collect { arrive() } }
+        val reader = launch { for (text in speech) ports.tts.speak(text) }
+        val watchers = listOf(
+            launch { ports.location.fixes.collect { onFix(it) } },
+            launch { ports.navi.arrivals.collect { arrive() } },
+            launch { ports.vehicle.doors.collect { onDoors(it, this@coroutineScope) } },
+        )
         while (isActive && _state.value?.phase == TripPhase.DRIVING) {
             sendTick()
             delay(SEND_INTERVAL_MS)
         }
-        fixes.cancel()
-        arrivals.cancel()
+        watchers.forEach { it.cancel() }
+        doorHold?.cancel()
+        // Let the last announcements ("운행을 마쳤어요") finish before the service stops
+        speech.close()
+        reader.join()
     }
 
     /** [도착 처리], the navi's arrival callback, or the 80 m check */
@@ -143,21 +182,28 @@ class TripController(
         _state.update { it?.copy(stops = it.stops.withStatus(it.currentIndex, StopStatus.ARRIVED), legEtaSeconds = 0, error = null) }
     }
 
-    /** [탑승 완료] (pickup) / [다음으로] (waypoint) */
-    suspend fun complete() = stopLock.withLock {
-        val s = _state.value ?: return
-        val stop = s.current ?: return
-        if (s.phase != TripPhase.DRIVING || stop.status != StopStatus.ARRIVED) return
-        call { api.sendEvent(s.tripId, s.driverToken, EventBody("stopCompleted", stop.order, "button")) } ?: return
+    /** [탑승 완료] (pickup) / [다음으로] (waypoint): the fallback when doors or departure aren't detected */
+    suspend fun complete() = stopLock.withLock { completeCurrent("button") }
+
+    /**
+     * Completes the current (arrived) stop and routes the navi to the next one, or ends the trip.
+     * Returns true if it went through. Call with [stopLock] held.
+     */
+    private suspend fun completeCurrent(by: String): Boolean {
+        val s = _state.value ?: return false
+        val stop = s.current ?: return false
+        if (s.phase != TripPhase.DRIVING || stop.status != StopStatus.ARRIVED) return false
+        call { api.sendEvent(s.tripId, s.driverToken, EventBody("stopCompleted", stop.order, by)) } ?: return false
         val done = s.stops.withStatus(s.currentIndex, StopStatus.COMPLETED)
 
         if (s.isLastStop) {
             finish(s.copy(stops = done))
-            return
+            return true
         }
         val next = s.currentIndex + 1
         _state.value = s.copy(currentIndex = next, stops = done.withStatus(next, StopStatus.CURRENT), legEtaSeconds = null, error = null)
         ports.navi.requestRoute(naviName(s.stops[next]), s.stops[next].position)
+        return true
     }
 
     /** Ends the trip early (or after the last stop) */
@@ -184,6 +230,7 @@ class TripController(
 
     private suspend fun onFix(fix: Fix) {
         var arrivedNow = false
+        var leftWaypoint = false
         _state.update { s ->
             s ?: return@update null
             val prev = s.lastFix
@@ -193,10 +240,65 @@ class TripController(
             val heading = fix.heading
                 ?: if (prev != null && moved > MIN_MOVE_FOR_HEADING_M) Geo.bearing(prev.position, fix.position) else prev?.heading
             val current = s.current
-            arrivedNow = current?.status == StopStatus.CURRENT && Geo.distance(fix.position, current.position) <= ARRIVAL_RADIUS_M
+            val away = current?.let { Geo.distance(fix.position, it.position) }
+            arrivedNow = current?.status == StopStatus.CURRENT && away!! <= ARRIVAL_RADIUS_M
+            // A waypoint is done once the car drives off: no door rule for errands
+            leftWaypoint = current?.kind == StopKind.WAYPOINT && current.status == StopStatus.ARRIVED && away!! > WAYPOINT_LEAVE_RADIUS_M
             s.copy(lastFix = fix.copy(heading = heading), speedKmh = speed)
         }
         if (arrivedNow) arrive()
+        if (leftWaypoint) stopLock.withLock { completeCurrent("departed") }
+    }
+
+    /**
+     * Boarding by door: at a pickup the car has reached (arrived, or within 80 m), a non-driver
+     * door opens and then all of them stay closed for 3 s. The driver's door never counts:
+     * drivers step out and back in.
+     */
+    private fun onDoors(doors: Map<Door, Boolean>, scope: CoroutineScope) {
+        val s = _state.value ?: return
+        val stop = s.current
+        if (stop == null || stop.order != doorStopOrder) {
+            // New stop: forget doors opened on the way here
+            doorStopOrder = stop?.order
+            passengerDoorOpened = false
+            doorHold?.cancel()
+            doorHold = null
+        }
+        if (stop == null || !doorRuleApplies(s, stop)) return
+
+        if (PASSENGER_DOORS.any { doors[it] == true }) {
+            passengerDoorOpened = true
+            doorHold?.cancel() // reopened before the hold ran out: start over when it closes again
+            doorHold = null
+        } else if (passengerDoorOpened && doorHold == null) {
+            doorHold = scope.launch {
+                delay(DOOR_CLOSED_HOLD_MS)
+                boardByDoor(stop.order)
+            }
+        }
+    }
+
+    private fun doorRuleApplies(s: TripState, stop: StopProgress): Boolean {
+        if (s.phase != TripPhase.DRIVING || stop.kind != StopKind.PICKUP) return false
+        val near = s.lastFix?.let { Geo.distance(it.position, stop.position) <= ARRIVAL_RADIUS_M } ?: false
+        return stop.status == StopStatus.ARRIVED || (stop.status == StopStatus.CURRENT && near)
+    }
+
+    private suspend fun boardByDoor(order: Int) {
+        doorHold = null
+        passengerDoorOpened = false
+        val s = _state.value ?: return
+        val stop = s.current?.takeIf { it.order == order } ?: return
+        if (!doorRuleApplies(s, stop)) return
+        if (stop.status == StopStatus.CURRENT) arrive() // within 80 m but not marked arrived yet
+        val wasLast = _state.value?.isLastStop == true
+        val done = stopLock.withLock { completeCurrent("door") }
+        if (done) say(if (wasLast) "운행을 마쳤어요" else "${order}번 탑승 완료. 다음 정류지로 안내할게요")
+    }
+
+    private fun say(text: String) {
+        speech.trySend(text)
     }
 
     private suspend fun sendTick() {
@@ -239,8 +341,18 @@ class TripController(
     private val channelListener = object : DriverChannel.Listener {
         override fun onConnection(connected: Boolean) = _state.update { it?.copy(connected = connected) }
 
-        override fun onReply(reply: PassengerReply) = _state.update {
-            it?.copy(replies = (listOf(ReplyLog(reply.stopOrder, reply.type, clock(), reply.position)) + it.replies).take(MAX_REPLIES))
+        /** Read it out and list it. Never touches the navi or the stops. */
+        override fun onReply(reply: PassengerReply) {
+            val log = ReplyLog(reply.stopOrder, reply.type, clock(), reply.position)
+            _state.update { it?.copy(replies = (listOf(log) + it.replies).take(MAX_REPLIES)) }
+            _replyEvents.tryEmit(log)
+            // The same passenger sending the same message again within 10 s is read once
+            val repeated = synchronized(lastSpokenAt) {
+                val key = reply.stopOrder to reply.type
+                val last = lastSpokenAt[key]
+                (last != null && log.atMs - last < REPEAT_WINDOW_MS).also { if (!it) lastSpokenAt[key] = log.atMs }
+            }
+            if (!repeated) say(log.text)
         }
 
         override fun onPassengerLocation(stopOrder: Int, position: LatLng?) = _state.update { s ->
@@ -254,6 +366,14 @@ class TripController(
         /** How close the navi's destination must be to the stop for its ETA to count */
         const val NAVI_MATCH_RADIUS_M = 150.0
         const val MAX_REPLIES = 30
+        /** All passenger doors must stay closed this long after one was opened */
+        const val DOOR_CLOSED_HOLD_MS = 3_000L
+        /** A waypoint counts as left once the car is this far from it */
+        const val WAYPOINT_LEAVE_RADIUS_M = 150.0
+        /** Same passenger, same message within this window: read once */
+        const val REPEAT_WINDOW_MS = 10_000L
+        /** Doors that mean a passenger: never the driver's (ROW_1_LEFT) */
+        val PASSENGER_DOORS = setOf(Door.FRONT_PASSENGER, Door.REAR_LEFT, Door.REAR_RIGHT)
         private const val MIN_MOVE_FOR_HEADING_M = 2.0
         private const val DETOUR_FACTOR = 1.3
         private const val FALLBACK_SPEED_MPS = 25 / 3.6

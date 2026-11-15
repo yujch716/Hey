@@ -23,6 +23,16 @@ class MainActivity : ComponentActivity() {
         permissionsReady.value = true
     }
 
+    override fun onResume() {
+        super.onResume()
+        isResumed = true
+    }
+
+    override fun onPause() {
+        isResumed = false
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         askPermissions()
@@ -44,5 +54,11 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
         }
         requestPermissions.launch(wanted.toTypedArray())
+    }
+
+    companion object {
+        /** Lets TripService check whether bringing the app to the front actually worked */
+        @Volatile var isResumed = false
+            private set
     }
 }

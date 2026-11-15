@@ -127,16 +127,25 @@ class TripControllerTest {
         override fun stop() = Unit
     }
 
-    private object StillVehicle : VehiclePort {
+    private class TestVehicle : VehiclePort {
         override val gear = MutableStateFlow(Gear.PARK)
         override val doors = MutableStateFlow(Door.entries.associateWith { false })
         override suspend fun start() = Unit
         override fun release() = Unit
+        fun door(d: Door, open: Boolean) {
+            doors.value = doors.value + (d to open)
+        }
     }
 
-    private object SilentTts : TtsPort {
+    /** Records what was said; each sentence takes 2 s, like real speech */
+    private class RecordingTts : TtsPort {
+        val spoken = mutableListOf<String>()
         override suspend fun start() = Unit
-        override fun speak(text: String) = Unit
+        override suspend fun speak(text: String) {
+            spoken += text
+            kotlinx.coroutines.delay(2_000)
+        }
+
         override fun release() = Unit
     }
 
@@ -144,8 +153,10 @@ class TripControllerTest {
     private val channel = RecordingChannel()
     private val navi = TestNavi()
     private val location = TestLocation()
+    private val vehicle = TestVehicle()
+    private val tts = RecordingTts()
 
-    private fun TestScope.controller() = TripController(api, channel, Ports(navi, location, StillVehicle, SilentTts), clock = { currentTime })
+    private fun TestScope.controller() = TripController(api, channel, Ports(navi, location, vehicle, tts), clock = { currentTime })
 
     private val drafts = listOf(
         StopDraft(1, Place("스타벅스 강남", "주소1", CAFE.lat, CAFE.lng), StopKind.WAYPOINT, "카페"),
@@ -334,5 +345,170 @@ class TripControllerTest {
         val s = c.state.value!!
         assertEquals("late", s.replies.first().type)
         assertEquals(PICKUP_2, s.stops[1].passengerLocation)
+    }
+
+    // ── 6단계: messages, door boarding, waypoint departure ──
+
+    /** Underway with the car standing at stop 2 (the first pickup), arrived */
+    private suspend fun TestScope.atPickup2(): TripController {
+        val c = underway()
+        c.arrive()
+        c.complete() // cafe done by button
+        fix(near(PICKUP_2, 10.0))
+        assertEquals(StopStatus.ARRIVED, c.state.value!!.current!!.status)
+        api.events.clear()
+        navi.routed.clear()
+        return c
+    }
+
+    private fun TestScope.door(d: Door, open: Boolean) {
+        vehicle.door(d, open)
+        runCurrent()
+    }
+
+    @Test
+    fun `a passenger door opened and closed for 3 s boards the pickup and routes on`() = runTest {
+        val c = atPickup2()
+        door(Door.REAR_RIGHT, true)
+        door(Door.REAR_RIGHT, false)
+        advanceTimeBy(2_900)
+        assertTrue(api.events.isEmpty())
+
+        advanceTimeBy(200)
+        assertEquals(listOf(EventBody("stopCompleted", 2, "door")), api.events)
+        assertEquals(3, c.state.value!!.current!!.order)
+        assertEquals("3번 정류지" to PICKUP_3, navi.routed.last())
+        advanceTimeBy(100)
+        assertEquals("2번 탑승 완료. 다음 정류지로 안내할게요", tts.spoken.last())
+    }
+
+    @Test
+    fun `the driver's door is ignored`() = runTest {
+        val c = atPickup2()
+        door(Door.DRIVER, true)
+        door(Door.DRIVER, false)
+        advanceTimeBy(10_000)
+
+        assertTrue(api.events.none { it.type == "stopCompleted" })
+        assertEquals(2, c.state.value!!.current!!.order)
+    }
+
+    @Test
+    fun `doors far from the pickup are ignored`() = runTest {
+        val c = underway()
+        c.arrive()
+        c.complete() // heading to stop 2, still ~1 km away
+        fix(near(CAFE, 10.0))
+        api.events.clear()
+        door(Door.FRONT_PASSENGER, true)
+        door(Door.FRONT_PASSENGER, false)
+        advanceTimeBy(10_000)
+
+        assertTrue(api.events.none { it.type == "stopCompleted" })
+        assertEquals(StopStatus.CURRENT, c.state.value!!.current!!.status)
+    }
+
+    @Test
+    fun `reopening before 3 s starts the wait over`() = runTest {
+        val c = atPickup2()
+        door(Door.FRONT_PASSENGER, true)
+        door(Door.FRONT_PASSENGER, false)
+        advanceTimeBy(2_000)
+        door(Door.REAR_LEFT, true) // someone else gets in
+        advanceTimeBy(1_500)
+        assertTrue(api.events.isEmpty())
+
+        door(Door.REAR_LEFT, false)
+        advanceTimeBy(2_900)
+        assertTrue(api.events.isEmpty())
+        advanceTimeBy(200)
+        assertEquals(EventBody("stopCompleted", 2, "door"), api.events.single())
+        assertEquals(3, c.state.value!!.current!!.order)
+    }
+
+    @Test
+    fun `a door closed within 80 m before the arrival event also arrives and boards`() = runTest {
+        val c = underway()
+        c.arrive()
+        c.complete()
+        // Within 80 m of stop 2 but the car hasn't been marked arrived (e.g. the arrival call failed)
+        api.failNext = true
+        fix(near(PICKUP_2, 40.0))
+        assertEquals(StopStatus.CURRENT, c.state.value!!.current!!.status)
+        api.events.clear()
+
+        door(Door.FRONT_PASSENGER, true)
+        door(Door.FRONT_PASSENGER, false)
+        advanceTimeBy(3_100)
+        assertEquals(listOf(EventBody("stopArrived", 2), EventBody("stopCompleted", 2, "door")), api.events)
+    }
+
+    @Test
+    fun `a waypoint is not completed by doors, but by driving 150 m away`() = runTest {
+        val c = underway()
+        fix(near(CAFE, 10.0)) // arrived at the cafe
+        api.events.clear()
+        door(Door.FRONT_PASSENGER, true)
+        door(Door.FRONT_PASSENGER, false)
+        advanceTimeBy(5_000)
+        assertTrue(api.events.isEmpty())
+
+        fix(near(CAFE, 120.0))
+        assertTrue(api.events.isEmpty())
+        fix(near(CAFE, 170.0))
+        assertEquals(listOf(EventBody("stopCompleted", 1, "departed")), api.events)
+        assertEquals(2, c.state.value!!.current!!.order)
+    }
+
+    @Test
+    fun `boarding the last pickup by door ends the trip and says so`() = runTest {
+        val c = atPickup2()
+        door(Door.REAR_RIGHT, true)
+        door(Door.REAR_RIGHT, false)
+        advanceTimeBy(3_100)
+        fix(near(PICKUP_3, 10.0))
+        door(Door.REAR_RIGHT, true)
+        door(Door.REAR_RIGHT, false)
+        advanceTimeBy(3_100)
+        advanceTimeBy(10_000)
+
+        assertEquals(TripPhase.ENDED, c.state.value!!.phase)
+        assertEquals("운행을 마쳤어요", tts.spoken.last())
+    }
+
+    @Test
+    fun `replies are read one after another, and only spoken, never routed`() = runTest {
+        val c = underway()
+        val routedBefore = navi.routed.toList()
+        channel.listener!!.onReply(PassengerReply(2, "out"))
+        channel.listener!!.onReply(PassengerReply(3, "late"))
+        channel.listener!!.onReply(PassengerReply(2, "waitHere", PICKUP_2))
+        runCurrent()
+        assertEquals(listOf("2번 탑승자가 나왔대요"), tts.spoken) // the next waits for this one to finish
+
+        advanceTimeBy(4_100)
+        assertEquals(
+            listOf("2번 탑승자가 나왔대요", "3번 탑승자가 5분 늦는대요", "2번 탑승자가 지금 있는 곳에서 기다린대요"),
+            tts.spoken,
+        )
+        assertEquals(routedBefore, navi.routed)
+        assertEquals(StopStatus.CURRENT, c.state.value!!.current!!.status)
+        assertEquals(3, c.state.value!!.replies.size)
+    }
+
+    @Test
+    fun `the same message from the same passenger within 10 s is read once`() = runTest {
+        underway()
+        channel.listener!!.onReply(PassengerReply(2, "out"))
+        advanceTimeBy(5_000)
+        channel.listener!!.onReply(PassengerReply(2, "out"))
+        channel.listener!!.onReply(PassengerReply(3, "out")) // different passenger: read
+        advanceTimeBy(5_000)
+        assertEquals(listOf("2번 탑승자가 나왔대요", "3번 탑승자가 나왔대요"), tts.spoken)
+
+        advanceTimeBy(6_000) // 11 s after the first
+        channel.listener!!.onReply(PassengerReply(2, "out"))
+        runCurrent()
+        assertEquals(3, tts.spoken.size)
     }
 }

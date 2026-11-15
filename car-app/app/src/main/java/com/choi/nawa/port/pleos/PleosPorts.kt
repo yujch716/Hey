@@ -15,6 +15,7 @@ import ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
 import ai.pleos.playground.tts.TextToSpeech
 import ai.pleos.playground.tts.constant.ErrorType
 import ai.pleos.playground.tts.constant.Mode
+import ai.pleos.playground.tts.listener.EventListener
 import ai.pleos.playground.tts.listener.OnInitializeListener
 import ai.pleos.playground.vehicle.Vehicle
 import ai.pleos.playground.vehicle.api.model.area.DoorArea
@@ -270,14 +271,29 @@ class PleosVehicle(context: Context) : VehiclePort {
     }
 }
 
-/** ON_DEVICE TextToSpeech: no Client ID/Secret needed. Wired up to replies in stage 6. */
+/** ON_DEVICE TextToSpeech: no Client ID/Secret needed. Korean (ko-KR) verified on the emulator. */
 class PleosTts(context: Context) : TtsPort {
     private val tts = TextToSpeech(context.applicationContext, Mode.ON_DEVICE)
     private val ready = MutableStateFlow(false)
+    @Volatile private var speaking: CompletableDeferred<Unit>? = null
+
+    private val events = object : EventListener {
+        override fun onStart() = Unit
+        override fun onReady() = Unit
+        override fun onDone() = finish()
+        override fun onError(errorType: ErrorType) {
+            Log.w(TAG, "TTS error: $errorType")
+            finish()
+        }
+
+        override fun onStop() = finish()
+        override fun onUpdatedRms(rms: Double) = Unit
+    }
 
     override suspend fun start() {
         tts.initialize(object : OnInitializeListener {
             override fun onSuccess() {
+                tts.addEventListener(events)
                 tts.setLocale(java.util.Locale.KOREA)
                 ready.value = true
             }
@@ -288,11 +304,30 @@ class PleosTts(context: Context) : TtsPort {
         })
     }
 
-    override fun speak(text: String) {
-        if (ready.value) tts.speak(text, true) else Log.w(TAG, "TTS not ready, dropped: $text")
+    override suspend fun speak(text: String) {
+        if (withTimeoutOrNull(3_000) { ready.first { it } } == null) {
+            Log.w(TAG, "TTS not ready, dropped: $text")
+            return
+        }
+        val done = CompletableDeferred<Unit>().also { speaking = it }
+        tts.speak(text, true)
+        // onDone normally ends it; never let one lost callback block the queue
+        withTimeoutOrNull(SPEAK_TIMEOUT_MS) { done.await() }
+        speaking = null
+    }
+
+    private fun finish() {
+        speaking?.complete(Unit)
     }
 
     override fun release() {
-        runCatching { tts.release() }
+        runCatching {
+            tts.removeEventListener(events)
+            tts.release()
+        }
+    }
+
+    private companion object {
+        const val SPEAK_TIMEOUT_MS = 15_000L
     }
 }

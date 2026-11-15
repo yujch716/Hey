@@ -12,7 +12,6 @@ import com.choi.nawa.port.Ports
 import com.choi.nawa.port.fake.DemoDrive
 import com.choi.nawa.port.fake.FakeLocation
 import com.choi.nawa.port.fake.FakeNavi
-import com.choi.nawa.port.fake.FakeTts
 import com.choi.nawa.port.fake.FakeVehicle
 import com.choi.nawa.port.pleos.PleosLocation
 import com.choi.nawa.port.pleos.PleosNavi
@@ -77,7 +76,8 @@ class AppContainer(private val app: Application) {
         val built = if (demo) {
             val drive = DemoDrive(scope).apply { speedMultiplier = settings.demoSpeed.first() }
             val vehicle = FakeVehicle(drive, scope)
-            ActivePorts(Ports(FakeNavi(drive), FakeLocation(drive, scope), vehicle, FakeTts()), true, drive, vehicle)
+            // Speech is real even in demo mode: it doesn't depend on the (simulated) car
+            ActivePorts(Ports(FakeNavi(drive), FakeLocation(drive, scope), vehicle, PleosTts(app)), true, drive, vehicle)
         } else {
             val navi = PleosNavi(app)
             ActivePorts(Ports(navi, PleosLocation(app, navi), PleosVehicle(app), PleosTts(app)), false, null, null)
@@ -94,7 +94,7 @@ class AppContainer(private val app: Application) {
             api = api,
             channel = SocketIoDriverChannel(BuildConfig.SERVER_URL),
             ports = active.ports,
-            onRoutePlanned = { route -> active.drive?.load(route) },
+            onRoutePlanned = { planned -> active.drive?.load(planned.route, planned.stops) },
         )
         _trip.value = controller
         return controller

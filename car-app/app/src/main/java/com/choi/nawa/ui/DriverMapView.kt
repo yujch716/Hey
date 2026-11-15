@@ -46,6 +46,8 @@ fun DriverMapView(url: String, modifier: Modifier = Modifier) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
+                // chrome://inspect in debug builds, to see the map page's console and network
+                if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
                 WebView(ctx).apply {
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     settings.javaScriptEnabled = true
