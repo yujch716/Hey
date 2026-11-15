@@ -77,7 +77,7 @@ class TripService : LifecycleService() {
         nm.notify(
             REPLY_NOTIFICATION_ID,
             NotificationCompat.Builder(this, REPLY_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_stat_hey)
                 .setContentTitle("탑승자 메시지")
                 .setContentText(reply.text)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -101,8 +101,8 @@ class TripService : LifecycleService() {
             nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "운행 중", NotificationManager.IMPORTANCE_LOW))
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("나와 운행 중")
+            .setSmallIcon(R.drawable.ic_stat_hey)
+            .setContentTitle("hey 운행 중")
             .setContentText("탑승자에게 차 위치를 보내고 있어요")
             .setContentIntent(openPanel())
             .setOngoing(true)
