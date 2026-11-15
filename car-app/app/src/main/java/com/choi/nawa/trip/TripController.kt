@@ -53,6 +53,8 @@ data class StopProgress(
     val passengerLocation: LatLng? = null,
     /** Planned driving time from the previous stop (the server's route), for the panel's later-stop ETAs */
     val legSeconds: Int = 0,
+    /** The searched place's address, shown to the driver under 픽업. Stays in the car: never sent to the server. */
+    val address: String = "",
 )
 
 data class ReplyLog(val stopOrder: Int, val type: String, val atMs: Long, val position: LatLng?) {
@@ -105,6 +107,8 @@ class TripController(
     private val clock: () -> Long = System::currentTimeMillis,
     /** The demo car needs the planned route (and which stops are waypoints) to drive along. No-op in real mode. */
     private val onRoutePlanned: (CreateTripResponse) -> Unit = {},
+    /** How often position and ETA go to the server (shorter in demo mode, see AppContainer) */
+    private val sendIntervalMs: Long = SEND_INTERVAL_MS,
 ) {
     private val _state = MutableStateFlow<TripState?>(null)
     val state: StateFlow<TripState?> = _state.asStateFlow()
@@ -140,7 +144,7 @@ class TripController(
             driverToken = res.driverToken,
             route = res.route,
             stops = res.stops.map { p ->
-                StopProgress(p.order, p.kind, p.label, p.position, StopStatus.UPCOMING, res.shares.find { it.stopId == "s${p.order}" }, legSeconds = p.legSeconds)
+                StopProgress(p.order, p.kind, p.label, p.position, StopStatus.UPCOMING, res.shares.find { it.stopId == "s${p.order}" }, legSeconds = p.legSeconds, address = drafts.getOrNull(p.order - 1)?.place?.address.orEmpty())
             },
             phase = TripPhase.PLANNED,
         )
@@ -166,7 +170,7 @@ class TripController(
         )
         while (isActive && _state.value?.phase == TripPhase.DRIVING) {
             sendTick()
-            delay(SEND_INTERVAL_MS)
+            delay(sendIntervalMs)
         }
         watchers.forEach { it.cancel() }
         doorHold?.cancel()

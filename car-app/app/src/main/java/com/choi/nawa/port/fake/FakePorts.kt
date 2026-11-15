@@ -68,6 +68,18 @@ class DemoDrive(private val scope: CoroutineScope) {
 
     val isMoving get() = target != null && !arrived
 
+    /**
+     * Put the parked car at [p] before a trip is planned, e.g. where the built-in navi thinks the car is,
+     * so the server's route and the navi's route start from the same point. Ignored once a route is loaded.
+     */
+    fun placeAt(p: LatLng) {
+        if (route.size > 1) return
+        route = listOf(p)
+        cum = listOf(0.0)
+        meters = 0.0
+        publish()
+    }
+
     /** Remaining metres to the current destination, null when there is none */
     val remainingMeters get() = target?.let { (it - meters).coerceAtLeast(0.0) }
 
@@ -187,6 +199,45 @@ class FakeNavi(private val drive: DemoDrive) : NaviPort {
 
     override suspend fun currentLocation(): Fix = drive.fix.value
     override fun release() = drive.stop()
+}
+
+/**
+ * Demo mode with the built-in navi on screen: the simulated car still decides position, ETA and arrival,
+ * and every destination change (and the cancel at the end) is also sent to the real navi so a demo video shows it.
+ * The real navi's own arrival callbacks are ignored: its car does not move in the emulator.
+ */
+class DemoNaviWithBuiltIn(private val fake: FakeNavi, private val builtIn: NaviPort) : NaviPort {
+    override val arrivals = fake.arrivals
+
+    override suspend fun start() {
+        fake.start()
+        builtIn.start()
+    }
+
+    override fun requestRoute(name: String, position: LatLng) {
+        fake.requestRoute(name, position)
+        runCatching { builtIn.requestRoute(name, position) }.onFailure { Log.w(TAG, "built-in navi requestRoute failed", it) }
+    }
+
+    override fun cancelRoute() {
+        fake.cancelRoute()
+        runCatching { builtIn.cancelRoute() }.onFailure { Log.w(TAG, "built-in navi cancelRoute failed", it) }
+    }
+
+    override suspend fun destination() = fake.destination()
+    override suspend fun currentLocation() = fake.currentLocation()
+
+    /** Where the built-in navi thinks the car is, or null if it doesn't answer */
+    suspend fun builtInLocation(): Fix? = builtIn.currentLocation()
+
+    override fun release() {
+        fake.release()
+        runCatching { builtIn.release() }
+    }
+
+    private companion object {
+        const val TAG = "NAWA_PORT"
+    }
 }
 
 /** One fix per second from the demo car */

@@ -34,6 +34,7 @@ import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -192,6 +193,9 @@ class TripControllerTest {
         assertEquals(TripPhase.PLANNED, s.phase)
         assertEquals(listOf(null, "tok2", "tok3"), s.stops.map { it.share?.token })
         assertEquals("http://web/send/tok2", s.stops[1].share!!.sendUrl)
+        // The address is for the driver's panel only: the trip state has it, the server request does not
+        assertEquals(listOf("주소1", "주소2", "주소3"), s.stops.map { it.address })
+        assertFalse(req.toString().contains("주소"))
     }
 
     @Test
