@@ -45,7 +45,7 @@ import com.choi.nawa.data.VehicleProfile
 /** First run (and 설정 > 차량 정보): what the passenger looks for at the curb. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun VehicleScreen(initial: VehicleProfile?, onSave: (VehicleProfile) -> Unit, onCancel: (() -> Unit)?) {
+fun VehicleScreen(initial: VehicleProfile?, onSave: (VehicleProfile) -> Unit, onCancel: (() -> Unit)?, locked: Boolean = false) {
     var model by remember { mutableStateOf(initial?.model ?: "") }
     var body by remember { mutableStateOf(initial?.bodyType ?: BodyType.SEDAN) }
     var color by remember { mutableStateOf(VehicleCatalog.colors.find { it.name == initial?.colorName } ?: VehicleCatalog.colors.first()) }
@@ -58,14 +58,16 @@ fun VehicleScreen(initial: VehicleProfile?, onSave: (VehicleProfile) -> Unit, on
         onBack = { onCancel?.invoke() },
     ) {
         Column(Modifier.widthIn(max = 760.dp).verticalScroll(rememberScrollState())) {
+            DrivingLockBanner(locked)
             Text("탑승자가 길에서 이 차를 찾을 때 보는 정보예요", fontSize = 18.sp, color = Muted)
 
             SectionTitle("차종")
-            ExposedDropdownMenuBox(expanded = menuOpen, onExpandedChange = { menuOpen = it }) {
+            ExposedDropdownMenuBox(expanded = menuOpen && !locked, onExpandedChange = { menuOpen = it && !locked }) {
                 OutlinedTextField(
                     value = model,
                     onValueChange = {},
                     readOnly = true,
+                    enabled = !locked,
                     placeholder = { Text("차종을 고르세요") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuOpen) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
@@ -88,7 +90,7 @@ fun VehicleScreen(initial: VehicleProfile?, onSave: (VehicleProfile) -> Unit, on
             SectionTitle("차체")
             Row(horizontalArrangement = Gap) {
                 for ((value, label) in listOf(BodyType.SEDAN to "세단", BodyType.SUV to "SUV")) {
-                    FilterChip(selected = body == value, onClick = { body = value }, label = { Text(label, fontSize = 18.sp) })
+                    FilterChip(selected = body == value, onClick = { body = value }, enabled = !locked, label = { Text(label, fontSize = 18.sp) })
                 }
             }
 
@@ -99,7 +101,7 @@ fun VehicleScreen(initial: VehicleProfile?, onSave: (VehicleProfile) -> Unit, on
                     Row(
                         Modifier
                             .border(BorderStroke(if (selected) 3.dp else 1.dp, if (selected) Ink else Color(0x33000000)), RoundedCornerShape(24.dp))
-                            .clickable { color = c }
+                            .clickable(enabled = !locked) { color = c }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -115,12 +117,13 @@ fun VehicleScreen(initial: VehicleProfile?, onSave: (VehicleProfile) -> Unit, on
                 onValueChange = { plate = it.take(12) },
                 placeholder = { Text("예: 123가 4567") },
                 singleLine = true,
+                enabled = !locked,
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 20.sp),
             )
 
             Spacer(Modifier.height(24.dp))
-            BigButton("저장", enabled = model.isNotBlank() && plate.isNotBlank()) {
+            BigButton("저장", enabled = !locked && model.isNotBlank() && plate.isNotBlank()) {
                 onSave(VehicleProfile(model = model, colorName = color.name, colorHex = color.hex, bodyType = body, plate = plate.trim()))
             }
         }

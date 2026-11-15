@@ -32,6 +32,7 @@ import com.choi.nawa.sdkcheck.Probes
 import com.choi.nawa.sdkcheck.SdkCheckScreen
 import com.choi.nawa.sdkcheck.TtsProbe
 import com.choi.nawa.sdkcheck.VehicleProbe
+import com.choi.nawa.port.Gear
 import com.choi.nawa.trip.TripPhase
 import kotlinx.coroutines.launch
 
@@ -58,6 +59,10 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
     val controller by container.trip.collectAsState()
     val tripState = controller?.state?.collectAsState()?.value
     val active by container.active.collectAsState()
+    // Inputs are for while stopped: anything but P (or not yet known) locks them
+    val gearFlow = active?.ports?.vehicle?.gear ?: remember { kotlinx.coroutines.flow.MutableStateFlow(Gear.UNKNOWN) }
+    val gear by gearFlow.collectAsState()
+    val driving = gear == Gear.DRIVE || gear == Gear.REVERSE || gear == Gear.NEUTRAL
     var overlay by remember { mutableStateOf<Overlay?>(null) }
 
     // Ports start once location permissions are settled (and again when demo mode flips)
@@ -81,6 +86,7 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
                 onSdkCheck = { overlay = Overlay.SdkCheck },
                 onPermissions = onRequestPermissions,
                 onBack = { overlay = null },
+                fakeVehicle = active?.fakeVehicle,
             )
             return
         }
@@ -89,6 +95,7 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
                 initial = vehicleLoad as? VehicleProfile,
                 onSave = { v -> scope.launch { container.settings.saveVehicle(v); overlay = Overlay.Settings } },
                 onCancel = { overlay = Overlay.Settings },
+                locked = driving,
             )
             return
         }
@@ -111,6 +118,7 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
             initial = null,
             onSave = { v -> scope.launch { container.settings.saveVehicle(v) } },
             onCancel = null,
+            locked = driving,
         )
         controller == null || tripState == null -> PrepareScreen(
             api = container.api,
@@ -126,6 +134,7 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
                 }
             },
             onSettings = { overlay = Overlay.Settings },
+            locked = driving,
         )
         tripState.phase == TripPhase.PLANNED -> ShareScreen(
             state = tripState,
@@ -142,6 +151,7 @@ fun NawaRoot(permissionsReady: Boolean, onRequestPermissions: () -> Unit) {
             controller = controller!!,
             state = tripState,
             fakeVehicle = active?.fakeVehicle,
+            driving = driving,
             onSettings = { overlay = Overlay.Settings },
             onNewTrip = { container.discardTrip() },
         )
@@ -162,6 +172,7 @@ private fun SettingsScreen(
     onSdkCheck: () -> Unit,
     onPermissions: () -> Unit,
     onBack: () -> Unit,
+    fakeVehicle: com.choi.nawa.port.fake.FakeVehicle?,
 ) {
     Screen(title = "설정", backLabel = "← 뒤로", onBack = onBack) {
         Column(Modifier.widthIn(max = 760.dp)) {
@@ -182,6 +193,7 @@ private fun SettingsScreen(
                     for (x in listOf(1, 5)) FilterChip(selected = demoSpeed == x, onClick = { onSpeed(x) }, label = { Text("${x}x", fontSize = 18.sp) })
                 }
             }
+            if (fakeVehicle != null) DemoVehicleControls(fakeVehicle)
             Spacer(Modifier.height(24.dp))
             SecondaryButton("차량 정보 수정", Modifier.fillMaxWidth(), onClick = onEditVehicle)
             Spacer(Modifier.height(12.dp))

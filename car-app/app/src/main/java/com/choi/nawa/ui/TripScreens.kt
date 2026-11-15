@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.choi.nawa.data.StopKind
 import com.choi.nawa.port.Door
+import com.choi.nawa.port.Gear
 import com.choi.nawa.port.fake.FakeVehicle
 import com.choi.nawa.trip.StopProgress
 import com.choi.nawa.trip.StopStatus
@@ -80,7 +82,14 @@ fun ShareScreen(state: TripState, onDepart: () -> Unit, onCancel: suspend () -> 
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PanelScreen(controller: TripController, state: TripState, fakeVehicle: FakeVehicle?, onSettings: () -> Unit, onNewTrip: () -> Unit) {
+fun PanelScreen(
+    controller: TripController,
+    state: TripState,
+    fakeVehicle: FakeVehicle?,
+    driving: Boolean,
+    onSettings: () -> Unit,
+    onNewTrip: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     fun act(block: suspend () -> Unit) {
@@ -129,27 +138,25 @@ fun PanelScreen(controller: TripController, state: TripState, fakeVehicle: FakeV
                 SectionTitle("정류지")
                 for (stop in state.stops) StopRow(stop)
 
+                // Messages only: they never change the destination or the stops
                 if (state.replies.isNotEmpty()) {
-                    SectionTitle("탑승자 응답")
-                    for (r in state.replies.take(6)) {
-                        Text("${r.stopOrder}번 정류지 · ${replyText(r.type)}${if (r.position != null) " (위치 있음)" else ""}", fontSize = 18.sp)
-                    }
-                }
-
-                if (fakeVehicle != null) {
-                    SectionTitle("데모: 문 (6단계에서 탑승 판정에 사용)")
-                    FlowRow(horizontalArrangement = Gap) {
-                        for ((door, label) in listOf(Door.REAR_RIGHT to "뒷좌석 오른쪽", Door.FRONT_PASSENGER to "조수석")) {
-                            SecondaryButton("$label 문 열기/닫기") { fakeVehicle.toggleDoor(door) }
+                    SectionTitle("탑승자 메시지")
+                    for (r in state.replies.take(8)) {
+                        Row(Modifier.padding(vertical = 4.dp)) {
+                            Text(clock(r.atMs), Modifier.width(64.dp), fontSize = 17.sp, color = Muted)
+                            Text("${r.text}${if (r.position != null) " (위치 표시)" else ""}", fontSize = 18.sp)
                         }
                     }
                 }
+
+                if (fakeVehicle != null) DemoVehicleControls(fakeVehicle)
             }
         }
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Gap, verticalAlignment = Alignment.CenterVertically) {
-            SecondaryButton("운행 종료", enabled = !busy) { act { controller.end() } }
+            // Only the one big button stays usable while driving
+            SecondaryButton("운행 종료", enabled = !busy && !driving) { act { controller.end() } }
             Spacer(Modifier.width(8.dp))
             when (current?.status) {
                 StopStatus.CURRENT -> BigButton("도착 처리", Modifier.weight(1f), enabled = !busy) { act { controller.arrive() } }
@@ -164,6 +171,25 @@ fun PanelScreen(controller: TripController, state: TripState, fakeVehicle: FakeV
         }
     }
 }
+
+/** Demo mode: the simulated car's doors and gear. Doors feed the real boarding detection. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DemoVehicleControls(fakeVehicle: FakeVehicle) {
+    val doors by fakeVehicle.doors.collectAsState()
+    val gear by fakeVehicle.gear.collectAsState()
+    SectionTitle("데모 차량")
+    FlowRow(horizontalArrangement = Gap, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for ((door, label) in listOf(Door.FRONT_PASSENGER to "조수석", Door.REAR_RIGHT to "뒷좌석 오른쪽", Door.DRIVER to "운전석")) {
+            SecondaryButton("$label 문 ${if (doors[door] == true) "닫기" else "열기"}") { fakeVehicle.toggleDoor(door) }
+        }
+        SecondaryButton("기어 ${gear.name.take(1)} → ${if (fakeVehicle.gearMode == null) "고정" else if (fakeVehicle.gearMode == Gear.PARK) "D" else "자동"}") {
+            fakeVehicle.toggleGear()
+        }
+    }
+}
+
+private fun clock(ms: Long) = java.text.SimpleDateFormat("HH:mm", java.util.Locale.KOREA).format(java.util.Date(ms))
 
 @Composable
 private fun StopRow(stop: StopProgress) {

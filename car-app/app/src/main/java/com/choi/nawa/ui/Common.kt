@@ -1,5 +1,6 @@
 package com.choi.nawa.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -73,3 +74,16 @@ fun ErrorText(message: String?) {
 }
 
 val Gap = Arrangement.spacedBy(12.dp)
+
+/** Shown on input screens while the gear is not P: planning happens only while stopped. */
+@Composable
+fun DrivingLockBanner(locked: Boolean) {
+    if (!locked) return
+    Text(
+        "정차 중에만 입력할 수 있어요",
+        Modifier.fillMaxWidth().padding(bottom = 12.dp).background(Signal, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).padding(16.dp),
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        color = Ink,
+    )
+}

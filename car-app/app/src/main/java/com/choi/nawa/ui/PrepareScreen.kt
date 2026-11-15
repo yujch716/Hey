@@ -54,6 +54,7 @@ fun PrepareScreen(
     demo: Boolean,
     onStart: suspend (List<StopDraft>) -> Unit,
     onSettings: () -> Unit,
+    locked: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
@@ -65,7 +66,7 @@ fun PrepareScreen(
     var nextId by remember { mutableStateOf(1L) }
 
     fun search() {
-        if (query.isBlank() || searching) return
+        if (query.isBlank() || searching || locked) return
         searching = true
         error = null
         scope.launch {
@@ -81,6 +82,7 @@ fun PrepareScreen(
     }
 
     Screen(title = if (demo) "운행 준비 · 데모" else "운행 준비", actionLabel = "설정", onAction = onSettings) {
+        DrivingLockBanner(locked)
         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
             // Left: search
             Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -91,12 +93,13 @@ fun PrepareScreen(
                         onValueChange = { query = it },
                         placeholder = { Text("예: 강남역 카페") },
                         singleLine = true,
+                        enabled = !locked,
                         modifier = Modifier.weight(1f),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 20.sp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { search() }),
                     )
-                    SecondaryButton(if (searching) "검색 중…" else "검색", enabled = !searching) { search() }
+                    SecondaryButton(if (searching) "검색 중…" else "검색", enabled = !searching && !locked) { search() }
                 }
                 ErrorText(error)
                 LazyColumn(Modifier.weight(1f)) {
@@ -104,7 +107,7 @@ fun PrepareScreen(
                         Column(
                             Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .clickable(enabled = !locked) {
                                     stops.add(StopDraft(nextId++, place, StopKind.PICKUP, ""))
                                 }
                                 .padding(vertical = 14.dp),
@@ -123,6 +126,7 @@ fun PrepareScreen(
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     itemsIndexed(stops, key = { _, s -> s.id }) { i, stop ->
                         StopCard(
+                            locked = locked,
                             index = i,
                             count = stops.size,
                             stop = stop,
@@ -137,7 +141,7 @@ fun PrepareScreen(
                 if (missingName) Text("경유지 이름을 넣어 주세요", color = Muted, fontSize = 16.sp)
                 BigButton(
                     if (starting) "운행 만드는 중…" else "운행 시작",
-                    enabled = stops.isNotEmpty() && stops.any { it.kind == StopKind.PICKUP } && !missingName && !starting,
+                    enabled = !locked && stops.isNotEmpty() && stops.any { it.kind == StopKind.PICKUP } && !missingName && !starting,
                 ) {
                     starting = true
                     error = null
@@ -157,7 +161,7 @@ fun PrepareScreen(
 }
 
 @Composable
-private fun StopCard(index: Int, count: Int, stop: StopDraft, onChange: (StopDraft) -> Unit, onMove: (Int) -> Unit, onRemove: () -> Unit) {
+private fun StopCard(locked: Boolean, index: Int, count: Int, stop: StopDraft, onChange: (StopDraft) -> Unit, onMove: (Int) -> Unit, onRemove: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(Paper, RoundedCornerShape(12.dp)).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${index + 1}", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
@@ -166,15 +170,16 @@ private fun StopCard(index: Int, count: Int, stop: StopDraft, onChange: (StopDra
                 Text(stop.place.name, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
                 Text(stop.place.address, fontSize = 15.sp, color = Muted)
             }
-            TextButton(onClick = { onMove(index - 1) }, enabled = index > 0) { Text("▲", fontSize = 20.sp) }
-            TextButton(onClick = { onMove(index + 1) }, enabled = index < count - 1) { Text("▼", fontSize = 20.sp) }
-            TextButton(onClick = onRemove) { Text("삭제", fontSize = 17.sp) }
+            TextButton(onClick = { onMove(index - 1) }, enabled = !locked && index > 0) { Text("▲", fontSize = 20.sp) }
+            TextButton(onClick = { onMove(index + 1) }, enabled = !locked && index < count - 1) { Text("▼", fontSize = 20.sp) }
+            TextButton(onClick = onRemove, enabled = !locked) { Text("삭제", fontSize = 17.sp) }
         }
         Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Gap) {
-            FilterChip(selected = stop.kind == StopKind.PICKUP, onClick = { onChange(stop.copy(kind = StopKind.PICKUP)) }, label = { Text("픽업", fontSize = 17.sp) })
+            FilterChip(selected = stop.kind == StopKind.PICKUP, onClick = { onChange(stop.copy(kind = StopKind.PICKUP)) }, enabled = !locked, label = { Text("픽업", fontSize = 17.sp) })
             FilterChip(
                 selected = stop.kind == StopKind.WAYPOINT,
                 onClick = { onChange(stop.copy(kind = StopKind.WAYPOINT, waypointName = stop.waypointName.ifBlank { stop.place.name.take(MAX_LABEL_LENGTH) })) },
+                enabled = !locked,
                 label = { Text("경유지", fontSize = 17.sp) },
             )
             if (stop.kind == StopKind.WAYPOINT) {
@@ -183,6 +188,7 @@ private fun StopCard(index: Int, count: Int, stop: StopDraft, onChange: (StopDra
                     onValueChange = { onChange(stop.copy(waypointName = it.take(MAX_LABEL_LENGTH))) },
                     placeholder = { Text("이름 (예: 카페)") },
                     singleLine = true,
+                    enabled = !locked,
                     modifier = Modifier.weight(1f),
                 )
             } else {

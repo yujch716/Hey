@@ -59,7 +59,9 @@ interface VehiclePort {
 
 interface TtsPort {
     suspend fun start()
-    fun speak(text: String)
+
+    /** Speaks and returns when done (or failed), so messages can be read one after another */
+    suspend fun speak(text: String)
     fun release()
 }
 
