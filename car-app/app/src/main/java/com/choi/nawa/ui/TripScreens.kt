@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -108,13 +107,9 @@ fun PanelScreen(controller: TripController, state: TripState, fakeVehicle: FakeV
     val current = state.current
     Screen(title = "운행 중", actionLabel = "설정", onAction = onSettings) {
         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-            // Map: placeholder until stage 6 fills it with a WebView
-            Box(
-                Modifier.weight(1.1f).fillMaxHeight().background(Paper, RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("지도 (6단계에서 WebView로 채워요)", color = Muted, fontSize = 18.sp)
-            }
+            // Map: the web's driver map (car, route, stops, passenger positions, "wait here" pins)
+            val mapUrl = remember(state.tripId) { driverMapUrl(state.tripId, state.driverToken) }
+            DriverMapView(mapUrl, Modifier.weight(1.1f).fillMaxHeight())
 
             Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                 if (current != null) {
