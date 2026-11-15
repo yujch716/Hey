@@ -90,7 +90,7 @@ function LiveTrip({ source, trip, snapshot }: { source: TripSource } & Omit<Read
 }
 
 /** Phone-width frame: full screen on a phone, centered column on a desktop. */
-function Frame({ children }: { children: ReactNode }) {
+export function Frame({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto flex h-[100dvh] w-full max-w-[430px] flex-col overflow-hidden bg-white sm:shadow-[0_0_0_1px_rgba(26,36,51,0.06),0_20px_60px_rgba(26,36,51,0.18)]">
       {children}
@@ -99,7 +99,7 @@ function Frame({ children }: { children: ReactNode }) {
 }
 
 /** Full-screen message in the same tone as the boarded banner. */
-function EndScreen({ headline, note, children }: { headline: string; note: string; children?: ReactNode }) {
+export function EndScreen({ headline, note, children }: { headline: string; note: string; children?: ReactNode }) {
   return (
     <section className="flex flex-1 flex-col justify-center bg-paper px-6" aria-live="polite">
       <h1 className="text-[34px] font-extrabold leading-[1.1] tracking-[-0.03em]">{headline}</h1>

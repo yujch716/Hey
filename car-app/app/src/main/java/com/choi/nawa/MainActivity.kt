@@ -1,47 +1,48 @@
 package com.choi.nawa
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import com.choi.nawa.ui.NawaRoot
 import com.choi.nawa.ui.theme.NawaTheme
 
 class MainActivity : ComponentActivity() {
+    private val permissionsReady = mutableStateOf(false)
+
+    // FUSED_LOCATION is dangerous (runtime); ACCESS_FINE_LOCATION backs the location foreground service
+    private val requestPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        permissionsReady.value = true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        askPermissions()
         setContent {
-            NawaTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+            NawaTheme(dynamicColor = false) {
+                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                    Box(Modifier.padding(padding)) {
+                        NawaRoot(permissionsReady = permissionsReady.value, onRequestPermissions = ::askPermissions)
+                    }
                 }
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    NawaTheme {
-        Greeting("Android")
+    private fun askPermissions() {
+        val wanted = buildList {
+            add("pleos.car.permission.FUSED_LOCATION")
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        requestPermissions.launch(wanted.toTypedArray())
     }
 }

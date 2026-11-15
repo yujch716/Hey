@@ -39,6 +39,7 @@ yarn test
 - `src/trips/phase.spec.ts`: phase 계산(120초 경계, 앞 정류지 대기, 내 차례 이후, 뒤 순번 탑승자)과 정류지별 ETA 계산
 - `src/trips/trips.service.spec.ts`: 경로 계획, 공유 토큰 발급·만료, 정류지 단위 진행, 탑승자 위치 전달, 운전자 조회, 동시 요청 순서
 - `src/directions/route-planner.spec.ts`: 카카오 응답 해석, 실패·키 없음일 때 직선 대체
+- `src/places/places.service.spec.ts`: 장소 검색(카카오 응답 해석, 실패 시 502, 키 없음 더미)
 - `src/common/geo.spec.ts`: 경로 위 진행 위치(`traveledIndex`)
 
 ## 설정 (.env)
@@ -48,7 +49,7 @@ yarn test
 | `PORT` | `3000` | |
 | `CORS_ORIGIN` | `http://localhost:5173` | HTTP와 socket.io 둘 다. 쉼표로 여러 개 |
 | `WEB_BASE_URL` | `http://localhost:5173` | 공유 링크 = `WEB_BASE_URL/t/{token}` |
-| `KAKAO_REST_API_KEY` | (없음) | 카카오모빌리티 길찾기. 없거나 호출이 실패하면 직선 대체 경로 |
+| `KAKAO_REST_API_KEY` | (없음) | 카카오모빌리티 길찾기·카카오 로컬 검색. 없으면 직선 대체 경로·더미 장소 |
 
 ## HTTP API
 
@@ -87,6 +88,16 @@ yarn test
   - `etaSeconds`는 아래 "정류지별 ETA"와 같은 계산이다. `POST /trips` 응답에서는 위치가 없으므로 계획 ETA다.
   - `passengerLocation { lat, lng, at }`은 그 탑승자가 위치를 공유하는 동안에만 있다.
 - 오류: 없는 운행 404, 토큰 불일치 401, 끝난 운행 409, 잘못된 body·stopOrder 400.
+
+### 장소 검색 (차량 앱)
+
+| 메서드 | 경로 | 응답 |
+| --- | --- | --- |
+| GET | `/places/search?query=&lat=&lng=` | 200 `[{ name, address, lat, lng }]` |
+
+- 카카오 로컬 키워드 검색 프록시. `lat`/`lng`를 주면 그 위치에서 가까운 순으로 정렬한다.
+- `KAKAO_REST_API_KEY`가 없으면 강남역 주변 고정 더미 장소를 돌려준다(이름이 맞는 것, 없으면 전부).
+- 키가 있는데 카카오 호출이 실패하면 502. 장소를 지어내지 않는다.
 
 ### 탑승자 (웹)
 
