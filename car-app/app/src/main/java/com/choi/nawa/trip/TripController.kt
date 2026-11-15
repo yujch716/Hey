@@ -51,6 +51,8 @@ data class StopProgress(
     val share: Share?,
     /** While that passenger shares their position */
     val passengerLocation: LatLng? = null,
+    /** Planned driving time from the previous stop (the server's route), for the panel's later-stop ETAs */
+    val legSeconds: Int = 0,
 )
 
 data class ReplyLog(val stopOrder: Int, val type: String, val atMs: Long, val position: LatLng?) {
@@ -138,7 +140,7 @@ class TripController(
             driverToken = res.driverToken,
             route = res.route,
             stops = res.stops.map { p ->
-                StopProgress(p.order, p.kind, p.label, p.position, StopStatus.UPCOMING, res.shares.find { it.stopId == "s${p.order}" })
+                StopProgress(p.order, p.kind, p.label, p.position, StopStatus.UPCOMING, res.shares.find { it.stopId == "s${p.order}" }, legSeconds = p.legSeconds)
             },
             phase = TripPhase.PLANNED,
         )

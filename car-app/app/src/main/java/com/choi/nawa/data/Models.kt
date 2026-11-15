@@ -20,6 +20,7 @@ data class VehicleProfile(
 enum class BodyType {
     @SerialName("sedan") SEDAN,
     @SerialName("suv") SUV,
+    @SerialName("truck") TRUCK,
 }
 
 @Serializable

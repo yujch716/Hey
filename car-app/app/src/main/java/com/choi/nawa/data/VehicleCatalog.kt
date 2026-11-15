@@ -1,27 +1,36 @@
 package com.choi.nawa.data
 
-data class CarModel(val brand: String, val name: String, val body: BodyType)
+data class CarModel(val name: String, val body: BodyType)
 
 data class CarColor(val name: String, val hex: String)
 
-/** Main Hyundai / Kia / Genesis models for the registration dropdown. The body type is a suggestion. */
+/** Main Hyundai models for the registration dropdown. */
 object VehicleCatalog {
     val models: List<CarModel> = listOf(
-        "현대" to listOf(
-            "아반떼" to BodyType.SEDAN, "쏘나타" to BodyType.SEDAN, "그랜저" to BodyType.SEDAN, "아이오닉 6" to BodyType.SEDAN,
-            "캐스퍼" to BodyType.SUV, "코나" to BodyType.SUV, "투싼" to BodyType.SUV, "싼타페" to BodyType.SUV,
-            "팰리세이드" to BodyType.SUV, "아이오닉 5" to BodyType.SUV, "아이오닉 9" to BodyType.SUV, "스타리아" to BodyType.SUV,
-        ),
-        "기아" to listOf(
-            "K5" to BodyType.SEDAN, "K8" to BodyType.SEDAN, "모닝" to BodyType.SEDAN, "레이" to BodyType.SUV,
-            "셀토스" to BodyType.SUV, "스포티지" to BodyType.SUV, "쏘렌토" to BodyType.SUV, "카니발" to BodyType.SUV,
-            "EV3" to BodyType.SUV, "EV6" to BodyType.SUV, "EV9" to BodyType.SUV,
-        ),
-        "제네시스" to listOf(
-            "G70" to BodyType.SEDAN, "G80" to BodyType.SEDAN, "G90" to BodyType.SEDAN,
-            "GV60" to BodyType.SUV, "GV70" to BodyType.SUV, "GV80" to BodyType.SUV,
-        ),
-    ).flatMap { (brand, list) -> list.map { (name, body) -> CarModel(brand, name, body) } }
+        // Sedan
+        CarModel("아반떼", BodyType.SEDAN),
+        CarModel("쏘나타", BodyType.SEDAN),
+        CarModel("그랜저", BodyType.SEDAN),
+        CarModel("아이오닉 6", BodyType.SEDAN),
+
+        // SUV
+        CarModel("캐스퍼", BodyType.SUV),
+        CarModel("베뉴", BodyType.SUV),
+        CarModel("코나", BodyType.SUV),
+        CarModel("투싼", BodyType.SUV),
+        CarModel("싼타페", BodyType.SUV),
+        CarModel("팰리세이드", BodyType.SUV),
+        CarModel("아이오닉 5", BodyType.SUV),
+        CarModel("아이오닉 9", BodyType.SUV),
+        CarModel("넥쏘", BodyType.SUV),
+
+        // MPV
+        CarModel("스타리아", BodyType.SUV),
+
+        // Commercial
+        CarModel("포터", BodyType.TRUCK),
+        CarModel("ST1", BodyType.TRUCK),
+    )
 
     val colors: List<CarColor> = listOf(
         CarColor("흰색", "#f4f5f7"),

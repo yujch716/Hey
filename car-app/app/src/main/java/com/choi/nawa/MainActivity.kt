@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         askPermissions()
         setContent {
-            NawaTheme(dynamicColor = false) {
+            NawaTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
                     Box(Modifier.padding(padding)) {
                         NawaRoot(permissionsReady = permissionsReady.value, onRequestPermissions = ::askPermissions)

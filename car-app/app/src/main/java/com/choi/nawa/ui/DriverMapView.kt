@@ -9,25 +9,19 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.choi.nawa.BuildConfig
+import com.choi.nawa.ui.theme.Palette
 
 /** The web's driver map for this trip. The token rides in the hash so it never reaches a server log. */
 fun driverMapUrl(tripId: String, driverToken: String) = "${BuildConfig.WEB_BASE_URL}/d/$tripId#token=$driverToken"
@@ -42,7 +36,7 @@ fun DriverMapView(url: String, modifier: Modifier = Modifier) {
     var failed by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
 
-    Box(modifier.clip(RoundedCornerShape(16.dp)).background(Paper)) {
+    Box(modifier.clip(CardShape).background(Palette.Ground)) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -72,12 +66,7 @@ fun DriverMapView(url: String, modifier: Modifier = Modifier) {
         )
 
         if (failed) {
-            Column(
-                Modifier.fillMaxSize().background(Paper),
-                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text("지도를 불러오지 못했어요", fontSize = 22.sp, color = Ink)
+            CenteredMessage("지도를 불러오지 못했어요") {
                 SecondaryButton("다시 시도") {
                     failed = false
                     webView?.loadUrl(url)

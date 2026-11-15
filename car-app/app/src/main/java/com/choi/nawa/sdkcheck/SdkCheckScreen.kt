@@ -1,5 +1,9 @@
 package com.choi.nawa.sdkcheck
 
+import com.choi.nawa.ui.PrimaryButton
+import com.choi.nawa.ui.SecondaryButton
+import com.choi.nawa.ui.theme.Palette
+
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.Build
@@ -25,9 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,11 +37,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 
 const val SERVER_URL = "http://10.0.2.2:3000"
@@ -67,7 +67,7 @@ fun SdkCheckScreen(probes: Probes, onRequestPermissions: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("SDK 검증", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("SDK 검증", style = MaterialTheme.typography.headlineSmall, color = Palette.Ink)
 
             Section("0. 권한")
             Buttons {
@@ -129,7 +129,7 @@ fun SdkCheckScreen(probes: Probes, onRequestPermissions: () -> Unit) {
             Modifier
                 .weight(1.4f)
                 .fillMaxHeight()
-                .background(Color(0xFF111418)),
+                .background(Palette.Ink),
         ) {
             if (showWeb) {
                 ProbeWebView(
@@ -146,7 +146,7 @@ fun SdkCheckScreen(probes: Probes, onRequestPermissions: () -> Unit) {
                     .padding(12.dp),
             ) {
                 items(ProbeLog.lines) { line ->
-                    Text(line, color = Color(0xFFD8DEE6), fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
+                    Text(line, color = Palette.Line, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace)
                 }
             }
         }
@@ -155,16 +155,16 @@ fun SdkCheckScreen(probes: Probes, onRequestPermissions: () -> Unit) {
 
 @Composable
 private fun Section(title: String) =
-    Text(title, Modifier.padding(top = 10.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    Text(title, Modifier.padding(top = 10.dp), style = MaterialTheme.typography.titleMedium, color = Palette.Muted)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Buttons(content: @Composable () -> Unit) =
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { content() }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
 
 @Composable
 private fun Btn(label: String, primary: Boolean = true, onClick: () -> Unit) =
-    if (primary) Button(onClick = onClick) { Text(label) } else OutlinedButton(onClick = onClick) { Text(label) }
+    if (primary) PrimaryButton(label, onClick = onClick) else SecondaryButton(label, onClick = onClick)
 
 /** The driver map could be the passenger web page. Does the head unit even have a WebView? */
 @SuppressLint("SetJavaScriptEnabled")
