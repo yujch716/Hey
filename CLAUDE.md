@@ -10,7 +10,7 @@
 
 | 폴더 | 내용 | 상태 |
 | --- | --- | --- |
-| `car-app/` | Kotlin, Android Studio, Pleos Connect SDK (minSdk 28, Gradle 8+) | 프로젝트 껍데기만 있음 |
+| `car-app/` | Kotlin, Jetpack Compose, Pleos Connect SDK (minSdk 28, Gradle 8+) | MVP (데모 모드 지원, 지도·문 감지·TTS는 6단계) |
 | `server/` | NestJS (TypeScript), socket.io, 나중에 PostgreSQL·Redis, yarn 4 | MVP (메모리 저장소) |
 | `web/` | React + Vite + TypeScript + Tailwind v4 + shadcn/ui, yarn 4 | 더미 데이터로 동작 |
 | `apk/` | 제출용 release APK (`팀명_nawa_release.apk`) | |
@@ -19,6 +19,35 @@ car-app SDK 버전 (`car-app/app/build.gradle.kts`):
 - `compileSdk = 37`: 사용하는 AndroidX 라이브러리(core 1.19, lifecycle 2.11)가 API 37 이상으로 컴파일해야 한다.
 - `targetSdk = 34`: Pleos 차량 OS가 API 34라서 동작 기준을 34에 맞춘다.
 - `minSdk = 28`: Pleos 보안 요건.
+
+## 차량 앱 (car-app)
+
+SDK 동작 근거는 `docs/sdk-findings.md`. 단일 Activity + Compose, 패키지 `com.choi.nawa`:
+
+| 위치 | 역할 |
+| --- | --- |
+| `port/Ports.kt` | `NaviPort`, `LocationPort`, `VehiclePort`, `TtsPort` 인터페이스 |
+| `port/pleos/` | Pleos SDK 구현. FusedLocation 미지원이면 NaviHelper 위치로 대체, Vehicle은 연결될 때까지 재시도 |
+| `port/fake/` | 데모 모드 구현. `DemoDrive`가 서버 경로를 따라 시속 25km(1x/5x)로 달린다 |
+| `trip/TripController.kt` | 운행 로직(단위 테스트 있음). 정류지 하나씩 `requestRoute` → 3초마다 위치·ETA 전송 → 도착(내비 콜백 또는 80m) → 버튼으로 완료 |
+| `trip/TripService.kt` | 포그라운드 서비스(위치 유형). `requestRoute`로 내비가 화면을 가져가도 운행 루프와 운전자 WebSocket을 유지 |
+| `data/` | 서버 API(OkHttp), socket.io, DataStore(차량 정보·설정), 차종 목록 |
+| `ui/` | 차량 등록 → 운행 준비 → 공유(QR) → 운행 패널, 설정 |
+| `sdkcheck/` | 3단계 SDK 검증 화면. 설정 > SDK 진단 |
+
+- 서버 주소는 `BuildConfig.SERVER_URL`(기본 `http://10.0.2.2:3000`, 에뮬레이터에서 맥북). 평문 http는 `10.0.2.2`만 허용.
+- 공유 QR은 웹의 `/send/{token}`을 연다. 운전자 폰에서 공유 시트로 `/t/{token}`을 보낸다.
+- 픽업 정류지 라벨은 서버에 `픽업`으로 보내고, 내비 목적지 이름은 `N번 정류지`로 넣는다(탑승자 이름 없음).
+- 테스트: `./gradlew testDebugUnitTest` (TripController, DemoDrive).
+
+### 데모 모드 (시연 영상용)
+
+1. 서버(`server/`)와 웹(`web/`, 에뮬레이터에서 보려면 `yarn dev --host 127.0.0.1`)을 띄운다.
+2. 앱 > 설정 > **데모 모드** 켜기, 필요하면 **데모 속도 5x**. 운행 중에는 바꿀 수 없다.
+3. 운행 준비에서 장소를 검색해 정류지를 넣고 [운행 시작] → 공유 화면의 QR → [출발].
+4. 가상 차량이 경로를 따라 움직이고, 정류지에 닿으면 자동으로 도착 처리된다. 패널에서 [다음으로]/[탑승 완료]를 누른다.
+5. 데모 모드의 시작 위치는 강남(교대 근처, `DEMO_ORIGIN`)이다. 장소 검색도 그 근처로 나온다.
+6. 패널의 [문 열기/닫기] 버튼은 `FakeVehicle`의 문 상태를 바꾼다(6단계 탑승 판정용).
 
 ## 핵심 개념
 
@@ -33,7 +62,8 @@ car-app SDK 버전 (`car-app/app/build.gradle.kts`):
 - **TripSnapshot**: 서버가 웹으로 보내는 실시간 상태.
   - `phase` = `departed` | `toEarlierStop` | `atEarlierStop` | `toMe` | `near` | `arrived` | `boarded` (EarlierStop = 내 앞 순번 정류지. 경유지든 다른 탑승자든)
   - 타입 기준은 `server/src/common/types.ts`. `web/src/types.ts`는 같은 내용으로 맞춘다.
-- **빠른 응답**: 탑승자가 [나왔어요] [5분 늦어요] [여기서 기다릴게요]를 누르면 차 안에서 TTS로 읽어준다.
+- **빠른 응답**: 탑승자의 [나왔어요] [5분 늦어요] [여기서 기다릴게요]는 단순 메시지다. 차량에서는 TTS로 읽고 앱 화면을 앞으로 띄워 보여줄 뿐, 내비 목적지나 운행 상태를 바꾸지 않는다.
+  - `waitHere`에 위치가 있으면 운전자 앱 지도에 핀으로만 표시한다. STT는 쓰지 않는다.
 - **정류지 진행**: 정류지 하나씩 `stopArrived` → `stopCompleted { by }` 순서로 진행한다. 완료 판정은 차량 앱이 한다.
   - 픽업: 정차 중 운전석이 아닌 문이 열렸다 닫힘(`door`), 또는 운전자의 [탑승 완료] 버튼(`button`)
   - 경유지: 운전자의 [다음으로] 버튼(`button`), 또는 도착 후 차가 다시 출발(`departed`)
