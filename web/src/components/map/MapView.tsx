@@ -3,11 +3,17 @@ import type { LatLng, Stop, TripSnapshot } from '@/types'
 import { KakaoMapView } from './KakaoMapView'
 import { MockMapView } from './MockMapView'
 
+/** Extra point on the map: a passenger's shared position, or where they said they'd wait */
+export type MapPin = { key: string; position: LatLng; label: string; tone: 'passenger' | 'wait' }
+
 export type MapViewProps = {
   route: LatLng[]
   stops: Stop[]
   snapshot: TripSnapshot
   me: LatLng | null
+  /** Pin text. Default is the passenger's view (내 위치 / 픽업 / waypoint name). */
+  labelOf?: (stop: Stop) => string
+  pins?: MapPin[]
 }
 
 const KAKAO_KEY = import.meta.env.VITE_KAKAO_MAP_KEY as string | undefined

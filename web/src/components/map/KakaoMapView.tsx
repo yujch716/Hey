@@ -4,14 +4,15 @@ import { CustomOverlayMap, Map, Polyline, useKakaoLoader } from 'react-kakao-map
 import type { LatLng } from '@/types'
 
 import { splitRoute, type MapViewProps } from './MapView'
-import { CarMarker, MeDot, StopPin } from './markers'
+import { CarMarker, LabeledPin, MeDot, StopPin } from './markers'
 
 /**
  * Kakao Maps JS. Needs a JavaScript key from developers.kakao.com,
  * with this site's domain (e.g. http://localhost:5173) registered under 플랫폼 > Web.
  */
-export function KakaoMapView({ appkey, route, stops, snapshot, me }: MapViewProps & { appkey: string }) {
-  const [loading, error] = useKakaoLoader({ appkey })
+export function KakaoMapView({ appkey, route, stops, snapshot, me, labelOf, pins = [] }: MapViewProps & { appkey: string }) {
+  // https explicitly: the default is protocol-relative, which an http dev page (or the car's WebView) turns into blocked http
+  const [loading, error] = useKakaoLoader({ appkey, url: 'https://dapi.kakao.com/v2/maps/sdk.js' })
   const { traveled, toMe, later } = splitRoute(route, stops, snapshot)
   const wrapper = useRef<HTMLDivElement>(null)
   const map = useRef<kakao.maps.Map | null>(null)
@@ -37,7 +38,7 @@ export function KakaoMapView({ appkey, route, stops, snapshot, me }: MapViewProp
   const onCreate = (created: kakao.maps.Map) => {
     map.current = created
     const bounds = new kakao.maps.LatLngBounds()
-    ;[...route, ...(me ? [me] : [])].forEach((p) => bounds.extend(new kakao.maps.LatLng(p.lat, p.lng)))
+    ;[...route, ...(me ? [me] : []), ...pins.map((p) => p.position)].forEach((p) => bounds.extend(new kakao.maps.LatLng(p.lat, p.lng)))
     created.setBounds(bounds, 48, 32, 48, 32)
   }
 
@@ -50,7 +51,13 @@ export function KakaoMapView({ appkey, route, stops, snapshot, me }: MapViewProp
 
         {stops.map((s) => (
           <CustomOverlayMap key={s.id} position={s.position} xAnchor={0} yAnchor={0}>
-            <StopPin stop={s} passed={s.order < snapshot.currentStopOrder} />
+            <StopPin stop={s} passed={s.order < snapshot.currentStopOrder} label={labelOf?.(s)} />
+          </CustomOverlayMap>
+        ))}
+
+        {pins.map((pin) => (
+          <CustomOverlayMap key={pin.key} position={pin.position} xAnchor={0} yAnchor={0} zIndex={2}>
+            <LabeledPin label={pin.label} tone={pin.tone} />
           </CustomOverlayMap>
         ))}
 
