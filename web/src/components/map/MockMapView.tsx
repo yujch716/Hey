@@ -10,7 +10,7 @@ import { CarMarker, LabeledPin, MeDot, StopPin } from './markers'
  * Offline stand-in for the Kakao map: a drawn street grid with the same overlays.
  * Used when VITE_KAKAO_MAP_KEY is not set, so the page works (and screenshots) without a key.
  */
-export function MockMapView({ route, stops, snapshot, me, labelOf, pins = [] }: MapViewProps) {
+export function MockMapView({ route, stops, snapshot, me, labelOf, pins = [], showTraveled = true }: MapViewProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 400, h: 400 })
   const [animate, setAnimate] = useState(false)
@@ -67,7 +67,9 @@ export function MockMapView({ route, stops, snapshot, me, labelOf, pins = [] }: 
         <rect x={size.w * 0.62} y={size.h * 0.66} width={size.w * 0.3} height={size.h * 0.2} rx="10" fill="#d6e6d3" />
         <path d={grid} stroke="#ffffff" strokeWidth="7" fill="none" />
         <path d={toPath(route)} stroke="#ffffff" strokeWidth="16" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-        <path d={toPath(traveled)} stroke="#a7b0bb" strokeWidth="6" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+        {showTraveled && (
+          <path d={toPath(traveled)} stroke="#a7b0bb" strokeWidth="6" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+        )}
         <path d={toPath(later)} stroke="#2e62f5" strokeOpacity="0.35" strokeWidth="6" fill="none" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="2 9" />
         {toMe.length > 1 && (
           <path d={toPath(toMe)} stroke="#2e62f5" strokeWidth="7" fill="none" strokeLinejoin="round" strokeLinecap="round" />

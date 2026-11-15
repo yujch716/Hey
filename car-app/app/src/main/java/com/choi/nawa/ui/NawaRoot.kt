@@ -6,9 +6,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,9 +24,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.choi.nawa.container
 import com.choi.nawa.data.VehicleProfile
 import com.choi.nawa.sdkcheck.LocationProbe
@@ -34,6 +37,7 @@ import com.choi.nawa.sdkcheck.TtsProbe
 import com.choi.nawa.sdkcheck.VehicleProbe
 import com.choi.nawa.port.Gear
 import com.choi.nawa.trip.TripPhase
+import com.choi.nawa.ui.theme.Palette
 import kotlinx.coroutines.launch
 
 private sealed interface Overlay {
@@ -175,22 +179,22 @@ private fun SettingsScreen(
     fakeVehicle: com.choi.nawa.port.fake.FakeVehicle?,
 ) {
     Screen(title = "설정", backLabel = "← 뒤로", onBack = onBack) {
-        Column(Modifier.widthIn(max = 760.dp)) {
-            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Card(Modifier.widthIn(max = 980.dp).weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+            Row(Modifier.fillMaxWidth().heightIn(min = TouchHeight), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("데모 모드", fontSize = 22.sp)
+                    Text("데모 모드", style = MaterialTheme.typography.titleLarge, color = Palette.Ink)
                     Text(
                         if (tripRunning) "운행 중에는 바꿀 수 없어요" else "가상 차량이 경로를 따라 달려요 (시연 영상용)",
-                        fontSize = 16.sp,
-                        color = Muted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Palette.Muted,
                     )
                 }
-                Switch(checked = demo, onCheckedChange = onDemo, enabled = !tripRunning)
+                Switch(checked = demo, onCheckedChange = onDemo, enabled = !tripRunning, modifier = Modifier.scale(1.4f).padding(end = 12.dp))
             }
             if (demo) {
-                Row(horizontalArrangement = Gap, verticalAlignment = Alignment.CenterVertically) {
-                    Text("데모 속도", fontSize = 18.sp)
-                    for (x in listOf(1, 5)) FilterChip(selected = demoSpeed == x, onClick = { onSpeed(x) }, label = { Text("${x}x", fontSize = 18.sp) })
+                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Gap, verticalAlignment = Alignment.CenterVertically) {
+                    Text("데모 속도", style = MaterialTheme.typography.titleMedium, color = Palette.Ink)
+                    for (x in listOf(1, 5)) ChoiceChip("${x}x", selected = demoSpeed == x) { onSpeed(x) }
                 }
             }
             if (fakeVehicle != null) DemoVehicleControls(fakeVehicle)

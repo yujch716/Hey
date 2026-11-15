@@ -14,6 +14,11 @@ export type MapViewProps = {
   /** Pin text. Default is the passenger's view (내 위치 / 픽업 / waypoint name). */
   labelOf?: (stop: Stop) => string
   pins?: MapPin[]
+  /**
+   * Draw the path the car has already driven (grey). The driver map turns it off: Kakao routes
+   * often U-turn and pass the same road again, and old legs piled under the next ones read as odd detours.
+   */
+  showTraveled?: boolean
 }
 
 const KAKAO_KEY = import.meta.env.VITE_KAKAO_MAP_KEY as string | undefined
