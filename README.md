@@ -152,7 +152,7 @@ AVD 설정 파일(`~/.android/avd/Pleos_Connect_v2.1.0.avd/config.ini`)과 시�
 
 ## 6. 시연 영상
 
-[<VIDEO_URL>](https://drive.google.com/file/d/1F4w6MMAA2GJgViHZHDfkeBA6YCG-b183/view?usp=sharing)
+[<https://drive.google.com/file/d/1F4w6MMAA2GJgViHZHDfkeBA6YCG-b183/view?usp=sharing>](https://drive.google.com/file/d/1F4w6MMAA2GJgViHZHDfkeBA6YCG-b183/view?usp=sharing)
 
 ---
 
