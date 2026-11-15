@@ -65,7 +65,7 @@ export function DriverMapScreen({ tripId, token }: { tripId: string; token: stri
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-ground">
-      <MapView route={view.route} stops={stops} snapshot={snapshot} me={null} labelOf={driverLabel} pins={pins} />
+      <MapView route={view.route} stops={stops} snapshot={snapshot} me={null} labelOf={driverLabel} pins={pins} showTraveled={false} />
 
       <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-xl bg-white/95 px-4 py-3 shadow-[0_4px_14px_rgba(26,36,51,0.18)]">
         {view.ended ? (

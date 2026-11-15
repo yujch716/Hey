@@ -10,7 +10,7 @@ import { CarMarker, LabeledPin, MeDot, StopPin } from './markers'
  * Kakao Maps JS. Needs a JavaScript key from developers.kakao.com,
  * with this site's domain (e.g. http://localhost:5173) registered under 플랫폼 > Web.
  */
-export function KakaoMapView({ appkey, route, stops, snapshot, me, labelOf, pins = [] }: MapViewProps & { appkey: string }) {
+export function KakaoMapView({ appkey, route, stops, snapshot, me, labelOf, pins = [], showTraveled = true }: MapViewProps & { appkey: string }) {
   // https explicitly: the default is protocol-relative, which an http dev page (or the car's WebView) turns into blocked http
   const [loading, error] = useKakaoLoader({ appkey, url: 'https://dapi.kakao.com/v2/maps/sdk.js' })
   const { traveled, toMe, later } = splitRoute(route, stops, snapshot)
@@ -45,7 +45,7 @@ export function KakaoMapView({ appkey, route, stops, snapshot, me, labelOf, pins
   return (
     <div ref={wrapper} className="h-full w-full">
       <Map center={route[0]} level={5} className="h-full w-full" onCreate={onCreate}>
-        <Polyline path={traveled} strokeColor="#a7b0bb" strokeWeight={6} strokeOpacity={1} />
+        {showTraveled && <Polyline path={traveled} strokeColor="#a7b0bb" strokeWeight={6} strokeOpacity={1} />}
         <Polyline path={later} strokeColor="#2e62f5" strokeWeight={5} strokeOpacity={0.35} strokeStyle="shortdot" />
         {toMe.length > 1 && <Polyline path={toMe} strokeColor="#2e62f5" strokeWeight={7} strokeOpacity={1} />}
 
