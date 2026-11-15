@@ -36,7 +36,7 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
 
   await app.listen(port)
-  console.log(`nawa server on http://localhost:${port} (CORS: ${origin.join(', ')})`)
+  console.log(`hey server on http://localhost:${port} (CORS: ${origin.join(', ')})`)
 }
 
 void bootstrap()

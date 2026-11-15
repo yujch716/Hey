@@ -5,7 +5,7 @@ import { KAKAO_LOCAL_CLIENT, type KakaoLocalClient, type Place } from './kakao-l
 
 /** Fixed places around 강남역 (same area as the demo trip), used when there is no Kakao key. */
 export const DUMMY_PLACES: Place[] = [
-  { name: '카페 나와 강남점', address: '서울 강남구 강남대로 382', lat: 37.4945, lng: 127.0245 },
+  { name: '카페 hey 강남점', address: '서울 강남구 강남대로 382', lat: 37.4945, lng: 127.0245 },
   { name: '강남역 11번 출구', address: '서울 강남구 강남대로 396', lat: 37.4986, lng: 127.0281 },
   { name: '역삼역 3번 출구', address: '서울 강남구 테헤란로 156', lat: 37.5005, lng: 127.03 },
   { name: '신논현역 6번 출구', address: '서울 강남구 봉은사로 102', lat: 37.5048, lng: 127.0255 },

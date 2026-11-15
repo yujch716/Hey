@@ -23,7 +23,7 @@ export function SendScreen({ token }: { token: string }) {
   const send = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: '나와 — 픽업 차량 위치', text: '차가 어디쯤 왔는지 여기서 볼 수 있어요', url: link })
+        await navigator.share({ title: 'hey — 픽업 차량 위치', text: '차가 어디쯤 왔는지 여기서 볼 수 있어요', url: link })
       } catch {
         // the user closed the share sheet
       }
